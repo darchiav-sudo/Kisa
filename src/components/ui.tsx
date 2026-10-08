@@ -62,10 +62,13 @@ export function PrimaryButton({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.primaryBtn,
+        { cursor: disabled || loading ? 'default' : 'pointer' } as object,
         (disabled || loading) && styles.btnDisabled,
         pressed && !disabled && { opacity: 0.9, transform: [{ scale: 0.985 }] },
       ]}
@@ -90,9 +93,12 @@ export function SecondaryButton({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed }) => [
         styles.secondaryBtn,
+        { cursor: 'pointer' } as object,
         tone === 'good' && styles.goodBtn,
         tone === 'ghost' && styles.ghostBtn,
         pressed && { opacity: 0.88 },
