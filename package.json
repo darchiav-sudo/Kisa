@@ -35,7 +35,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web --port 47831",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:e2e": "node scripts/demo-e2e.mjs"
   },
   "private": true
 }
