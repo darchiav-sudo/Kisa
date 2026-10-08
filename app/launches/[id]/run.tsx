@@ -115,8 +115,10 @@ export default function LaunchRunScreen() {
             currency: launch.economics.currency,
             label: action.label,
           });
+          completeStep(launchId, step.id);
+          completeLaunch(launchId);
           showToast('Payment recorded');
-          advance(step.id);
+          router.replace({ pathname: '/done', params: { id: launchId } });
           break;
         case 'repeat':
           resetLaunchProgress(launchId);
