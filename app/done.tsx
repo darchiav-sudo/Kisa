@@ -33,7 +33,7 @@ export default function DoneScreen() {
       <LinearGradient colors={['#173d29', '#080a0e']} style={StyleSheet.absoluteFill} />
       <View style={styles.wrap}>
         <Animated.View style={{ transform: [{ scale }], alignItems: 'center' }}>
-          <Text style={styles.badge}>FIRST MONEY</Text>
+          <Text style={styles.badge}>KISA</Text>
           <Text style={styles.amount}>
             {currency === 'USD' ? `$${last?.amount ?? total}` : `${last?.amount ?? total}₾`}
           </Text>

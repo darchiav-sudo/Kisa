@@ -54,7 +54,7 @@ export default function MoneyProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Kicker>Mode A · make money</Kicker>
-        <Title>Money profile</Title>
+        <Title>Your profile</Title>
         <Sub>Tell Kisa your constraints. We prepare launches — you approve.</Sub>
 
         <Card style={{ marginTop: spacing.lg }}>

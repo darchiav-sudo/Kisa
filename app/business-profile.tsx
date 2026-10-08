@@ -50,7 +50,7 @@ export default function BusinessProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Kicker tone="blue">Mode B · sell what you have</Kicker>
-        <Title>Business profile</Title>
+        <Title>Your business</Title>
         <Sub>Don’t invent a new business. Find the shortest path to cash for your product.</Sub>
 
         <Card style={{ marginTop: spacing.lg }}>

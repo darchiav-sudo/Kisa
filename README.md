@@ -1,6 +1,6 @@
-# Kisa Money Launcher
+# Kisa
 
-Native Expo + React Native + TypeScript MVP. The app prepares money / sales **Launches**; you approve the human steps. Prototypes were converted into typed mock data — not WebViews.
+Native Expo + React Native + TypeScript app. Kisa prepares money / sales **Launches**; you approve the human steps.
 
 ## Modes
 

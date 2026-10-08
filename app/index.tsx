@@ -39,7 +39,7 @@ export default function WelcomeScreen() {
       <Animated.View style={[styles.wrap, { opacity: fade, transform: [{ translateY: slide }] }]}>
         <View style={styles.top}>
           <Text style={styles.brand}>KISA</Text>
-          <Pill>Money Launcher</Pill>
+          <Pill>First money</Pill>
         </View>
 
         <Text style={styles.kicker}>APP PREPARES · YOU APPROVE</Text>

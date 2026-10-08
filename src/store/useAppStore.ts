@@ -11,7 +11,7 @@ import type {
   UserProfile,
 } from '@/src/models/types';
 
-const STORAGE_KEY = 'kisa-money-launcher-v1';
+const STORAGE_KEY = 'kisa-v1';
 
 interface AppState {
   hydrated: boolean;

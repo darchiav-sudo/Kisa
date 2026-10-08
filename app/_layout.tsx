@@ -64,8 +64,8 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="money-profile" options={{ title: 'Money profile' }} />
-        <Stack.Screen name="business-profile" options={{ title: 'Business profile' }} />
+        <Stack.Screen name="money-profile" options={{ title: 'Your profile' }} />
+        <Stack.Screen name="business-profile" options={{ title: 'Your business' }} />
         <Stack.Screen name="analysis" options={{ headerShown: false }} />
         <Stack.Screen name="launches/index" options={{ title: 'Your launches' }} />
         <Stack.Screen name="launches/[id]/index" options={{ title: 'Launch' }} />
