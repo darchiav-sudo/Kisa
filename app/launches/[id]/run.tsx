@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Animated,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -58,7 +59,11 @@ export default function LaunchRunScreen() {
 
   useEffect(() => {
     fade.setValue(0);
-    Animated.timing(fade, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 280,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
   }, [stepIndex, fade]);
 
   const showToast = (msg: string) => {

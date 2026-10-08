@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Pill, PrimaryButton, Sub, Title } from '@/src/components/ui';
@@ -19,9 +19,10 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     services.analytics.track('welcome_view');
+    const native = Platform.OS !== 'web';
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(slide, { toValue: 0, duration: 500, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 500, useNativeDriver: native }),
+      Animated.timing(slide, { toValue: 0, duration: 500, useNativeDriver: native }),
     ]).start();
   }, [fade, slide]);
 

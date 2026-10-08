@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton, SecondaryButton, Sub } from '@/src/components/ui';
@@ -17,7 +17,11 @@ export default function DoneScreen() {
   const scale = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
-    Animated.spring(scale, { toValue: 1, friction: 6, useNativeDriver: true }).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 6,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
   }, [scale]);
 
   const currency = launch?.economics.currency ?? 'USD';

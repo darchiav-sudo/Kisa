@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '@/src/components/ui';
@@ -26,10 +26,11 @@ export default function AnalysisScreen() {
   const pulse = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
+    const native = Platform.OS !== 'web';
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: native }),
+        Animated.timing(pulse, { toValue: 0.4, duration: 700, useNativeDriver: native }),
       ]),
     ).start();
   }, [pulse]);
