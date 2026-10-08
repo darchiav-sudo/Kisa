@@ -38,3 +38,19 @@ Progress, profiles, and demo earnings persist via Zustand + AsyncStorage.
 ## Stack
 
 Expo Router, Safe Area, Zustand, AsyncStorage, TypeScript. All opportunity / publish / lead services are mocked under `src/services/mocks`.
+
+## Backend (Railway + Neon)
+
+API lives in `backend/` (Hono + Neon Postgres).
+
+| Env | URL |
+|-----|-----|
+| development | https://api-development-471e.up.railway.app |
+| production | https://kisa-api-production.up.railway.app |
+
+Health: `GET /health`
+
+The Expo app uses `EXPO_PUBLIC_API_URL` or `app.json` → `extra.apiUrl` (defaults to development). Without it, local mocks still work.
+
+Neon project **Kisa** (`odd-feather-72183390`): branch `main` → production, branch `develop` → development.
+

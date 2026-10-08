@@ -39,6 +39,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "https://api-development-471e.up.railway.app"
     }
   }
 }
