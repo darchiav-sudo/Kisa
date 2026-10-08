@@ -7,30 +7,61 @@ import { mockServices } from '@/src/services/mocks';
 export function createServices(): AppServices {
   if (!isApiConfigured()) return mockServices;
 
+  const opportunity = {
+    async rankForMoney(profile: Parameters<AppServices['opportunity']['rankForMoney']>[0]) {
+      const res = await apiFetch<{ launches: { id: string }[] }>('/v1/launches/rank', {
+        method: 'POST',
+        json: {
+          mode: 'money',
+          location: profile.location,
+          budgetUsd: profile.budgetUsd,
+          timeHours: profile.timeHours,
+          hasCar: profile.hasCar,
+          channel: profile.channel,
+        },
+      });
+      const order = res.launches.map((l) => l.id);
+      const byId = new Map(getMoneyLaunches(profile).map((l) => [l.id, l]));
+      return order
+        .map((id, i) => {
+          const launch = byId.get(id);
+          if (!launch) return null;
+          return { ...launch, rank: i + 1, isPrimary: i === 0 };
+        })
+        .filter((l): l is NonNullable<typeof l> => l != null);
+    },
+    async rankForBusiness(profile: Parameters<AppServices['opportunity']['rankForBusiness']>[0]) {
+      const res = await apiFetch<{ launches: { id: string }[] }>('/v1/launches/rank', {
+        method: 'POST',
+        json: {
+          mode: 'business',
+          product: profile.product,
+          location: profile.location,
+          adBudget: profile.adBudget,
+          hasAudience: profile.hasAudience,
+          remoteOk: profile.remoteOk,
+          goal: profile.goal,
+        },
+      });
+      const order = res.launches.map((l) => l.id);
+      const byId = new Map(getBusinessLaunches(profile).map((l) => [l.id, l]));
+      return order
+        .map((id, i) => {
+          const launch = byId.get(id);
+          if (!launch) return null;
+          return { ...launch, rank: i + 1, isPrimary: i === 0 };
+        })
+        .filter((l): l is NonNullable<typeof l> => l != null);
+    },
+  };
+
   return {
     ...mockServices,
-    opportunity: {
-      async rankForMoney(profile) {
-        const res = await apiFetch<{ launches: { id: string }[] }>('/v1/launches/rank', {
-          method: 'POST',
-          json: { mode: 'money' },
-        });
-        const ids = new Set(res.launches.map((l) => l.id));
-        return getMoneyLaunches(profile).filter((l) => ids.has(l.id));
-      },
-      async rankForBusiness(profile) {
-        const res = await apiFetch<{ launches: { id: string }[] }>('/v1/launches/rank', {
-          method: 'POST',
-          json: { mode: 'business' },
-        });
-        const ids = new Set(res.launches.map((l) => l.id));
-        return getBusinessLaunches(profile).filter((l) => ids.has(l.id));
-      },
-    },
+    opportunity,
     launchGeneration: {
       async generate(mode, profile) {
-        if (mode === 'money') return getMoneyLaunches(profile as never);
-        return getBusinessLaunches(profile as never);
+        if (mode === 'money') return opportunity.rankForMoney(profile as never);
+        return opportunity.rankForBusiness(profile as never);
       },
     },
     distribution: {

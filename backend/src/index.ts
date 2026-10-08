@@ -4,7 +4,6 @@ import { cors } from 'hono/cors';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-import { businessLaunches, moneyLaunches } from './data/launches.js';
 import { getSql } from './db/client.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -31,6 +30,7 @@ app.get('/health', (c) =>
     ok: true,
     service: 'kisa-api',
     env: process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV || 'local',
+    openai: Boolean(process.env.OPENAI_API_KEY),
     time: new Date().toISOString(),
   }),
 );
@@ -128,14 +128,51 @@ app.put('/v1/profiles/business', async (c) => {
 
 app.post('/v1/launches/rank', async (c) => {
   const body = z
-    .object({ mode: z.enum(['money', 'business']) })
+    .object({
+      mode: z.enum(['money', 'business']),
+      location: z.string().optional(),
+      budgetUsd: z.number().optional(),
+      timeHours: z.string().optional(),
+      hasCar: z.boolean().optional(),
+      channel: z.string().optional(),
+      product: z.string().optional(),
+      adBudget: z.string().optional(),
+      hasAudience: z.boolean().optional(),
+      remoteOk: z.boolean().optional(),
+      goal: z.string().optional(),
+    })
     .parse(await c.req.json());
-  const launches = body.mode === 'money' ? moneyLaunches : businessLaunches;
+
+  const { rankLaunches } = await import('./ai/rank.js');
+  const result = await rankLaunches(
+    body.mode === 'money'
+      ? {
+          mode: 'money',
+          location: body.location,
+          budgetUsd: body.budgetUsd,
+          timeHours: body.timeHours,
+          hasCar: body.hasCar,
+          channel: body.channel,
+        }
+      : {
+          mode: 'business',
+          product: body.product,
+          location: body.location,
+          adBudget: body.adBudget,
+          hasAudience: body.hasAudience,
+          remoteOk: body.remoteOk,
+          goal: body.goal,
+        },
+  );
+
   return c.json({
     mode: body.mode,
-    launches,
+    launches: result.launches,
+    rationale: result.rationale,
+    engine: result.engine,
+    openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
     generatedAt: new Date().toISOString(),
-    note: 'Ranked locally from catalog. Demand numbers are not invented.',
+    note: 'Never invents demand numbers or guarantees income.',
   });
 });
 
