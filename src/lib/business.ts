@@ -1,9 +1,13 @@
 import type {
   Business,
   BusinessSummary,
+  Gap,
   Idea,
   Intake,
+  LeadMessage,
   LeadStatus,
+  MoneyEntry,
+  Payment,
   SavedIdea,
   TaskStatus,
 } from '@/src/models/types';
@@ -24,6 +28,16 @@ export async function findIdea(intake: Intake, exclude: string[], mode: IdeaMode
     method: 'POST',
     json: { intake, exclude, mode },
   });
+  return idea;
+}
+
+export async function huntGaps(intake: Intake, refresh = false) {
+  return apiFetch<{ gaps: Gap[]; huntedAt: string }>('/v1/gaps', { method: 'POST', json: { intake, refresh } });
+}
+
+export async function gapToIdea(intake: Intake, gap: Gap) {
+  const { fit: _fit, whyYou: _why, demand: _d, competition: _c, ...input } = gap;
+  const { idea } = await apiFetch<{ idea: Idea }>('/v1/gaps/idea', { method: 'POST', json: { intake, gap: input } });
   return idea;
 }
 
@@ -67,12 +81,110 @@ export async function setLeadStatus(businessId: string, leadId: string, status: 
   );
 }
 
+export async function addMoney(businessId: string, input: { kind: 'income' | 'expense'; amount: number; label?: string }) {
+  return store(
+    await apiFetch<BusinessResponse>(`/v1/businesses/${businessId}/money`, { method: 'POST', json: input }),
+  );
+}
+
+export async function moneyEntries(businessId: string) {
+  const { entries } = await apiFetch<{ entries: MoneyEntry[] }>(`/v1/businesses/${businessId}/money`);
+  return entries;
+}
+
+export async function updateMoney(
+  businessId: string,
+  entryId: string,
+  patch: { kind?: MoneyEntry['kind']; amount?: number; label?: string },
+) {
+  return store(
+    await apiFetch<BusinessResponse>(`/v1/businesses/${businessId}/money/${entryId}`, { method: 'PATCH', json: patch }),
+  );
+}
+
+/** Returns the deleted entry so the caller can offer Undo. */
+export async function deleteMoney(businessId: string, entryId: string) {
+  const res = await apiFetch<BusinessResponse & { deleted: Omit<MoneyEntry, 'id'> }>(
+    `/v1/businesses/${businessId}/money/${entryId}`,
+    { method: 'DELETE' },
+  );
+  store(res);
+  return res.deleted;
+}
+
+export async function restoreMoney(businessId: string, entry: Omit<MoneyEntry, 'id'>) {
+  return store(
+    await apiFetch<BusinessResponse>(`/v1/businesses/${businessId}/money/restore`, { method: 'POST', json: entry }),
+  );
+}
+
+/** Runs Kisa's autopilot right now: scout, tune the website if needed, plan today. Returns what it did. */
+export async function runKisaNow(businessId: string) {
+  const res = await apiFetch<BusinessResponse & { did: string[] }>(`/v1/businesses/${businessId}/autopilot`, {
+    method: 'POST',
+  });
+  store(res);
+  return res.did;
+}
+
+export async function draftFollowUp(businessId: string, leadId: string) {
+  const { text } = await apiFetch<{ text: string }>(`/v1/businesses/${businessId}/leads/${leadId}/followup`, {
+    method: 'POST',
+    json: {},
+  });
+  return text;
+}
+
 export async function draftLeadReply(businessId: string, leadId: string, fresh = false) {
   const { text } = await apiFetch<{ text: string }>(
     `/v1/businesses/${businessId}/leads/${leadId}/draft`,
     { method: 'POST', json: { fresh } },
   );
   return text;
+}
+
+export async function leadMessages(businessId: string, leadId: string) {
+  const { messages } = await apiFetch<{ messages: LeadMessage[] }>(
+    `/v1/businesses/${businessId}/leads/${leadId}/messages`,
+  );
+  return messages;
+}
+
+/** Kisa delivers the reply through the channel the customer used (Telegram). */
+export async function sendReply(businessId: string, leadId: string, text: string) {
+  return store(
+    await apiFetch<BusinessResponse>(`/v1/businesses/${businessId}/leads/${leadId}/send`, {
+      method: 'POST',
+      json: { text },
+    }),
+  );
+}
+
+export async function deleteSentMessage(businessId: string, leadId: string, messageId: string) {
+  await apiFetch(`/v1/businesses/${businessId}/leads/${leadId}/messages/${messageId}`, { method: 'DELETE' });
+}
+
+export async function updateSettings(businessId: string, settings: { autoReply?: boolean; payment?: Payment | null }) {
+  return store(
+    await apiFetch<BusinessResponse>(`/v1/businesses/${businessId}/settings`, { method: 'PATCH', json: settings }),
+  );
+}
+
+export async function telegramLinkCode(businessId: string) {
+  return apiFetch<{ code: string; bot: string }>(`/v1/businesses/${businessId}/telegram/code`, { method: 'POST' });
+}
+
+export async function disconnectTelegramChannel(businessId: string) {
+  return store(await apiFetch<BusinessResponse>(`/v1/businesses/${businessId}/telegram/channel`, { method: 'DELETE' }));
+}
+
+export async function postToTelegram(businessId: string, text: string) {
+  await apiFetch(`/v1/businesses/${businessId}/telegram/post`, { method: 'POST', json: { text } });
+}
+
+/** One line a customer can act on: the link and/or the transfer details. */
+export function paymentText(payment: Payment) {
+  return [payment.link, payment.details].filter(Boolean).join('\n');
 }
 
 export async function archiveBusiness(businessId: string) {

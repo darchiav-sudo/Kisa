@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   LayoutAnimation,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,7 +20,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Backdrop, OptionPill, PrimaryButton, StepDots, tap } from '@/src/components/ui';
 import {
   ASSETS,
+  ASSETS_FEATURED,
   LANGUAGES,
+  LANGUAGES_FEATURED,
   Option,
   OptionGroup,
   PRODUCT,
@@ -36,22 +37,43 @@ import type { Area, Coords, Intake } from '@/src/models/types';
 import { useAppStore } from '@/src/store/useAppStore';
 import { colors, iconPalette } from '@/src/theme/colors';
 
-const native = Platform.OS !== 'web';
-
 type Answers = {
   start: string[];
   product: string[];
   budget: string[];
   assets: string[];
   skills: string[];
+  loves: string[];
   languages: string[];
   workStyle: string[];
 };
 
 type Step =
   | { id: keyof Answers; kind: 'single'; title: string; subtitle: string; options: (inGeorgia: boolean) => Option[] }
-  | { id: keyof Answers; kind: 'multi'; title: string; subtitle: string; groups: OptionGroup[]; collapseTo?: number }
+  | {
+      id: keyof Answers;
+      kind: 'multi';
+      title: string;
+      subtitle: string;
+      groups: OptionGroup[];
+      /** Options shown before "Show more": the first N, or exactly these labels. */
+      collapseTo?: number;
+      featured?: string[];
+    }
+  | { id: 'loves'; kind: 'loves'; title: string; subtitle: string }
   | { id: 'location'; kind: 'location'; title: string; subtitle: string };
+
+const ALL_OPTIONS = [...SKILLS, ...ASSETS].flatMap((g) => g.options);
+
+/** "What would you love to do?" offers back what they already said they're good at and have. */
+function loveGroups(answers: Answers): OptionGroup[] {
+  const pick = (labels: string[]) =>
+    labels.map((label) => ALL_OPTIONS.find((o) => (o.value ?? o.label) === label) ?? { label, icon: 'heart' as const });
+  return [
+    { title: 'What you’re good at', options: pick(answers.skills) },
+    { title: 'What you have', options: pick(answers.assets) },
+  ].filter((g) => g.options.length);
+}
 
 const STEPS: Step[] = [
   {
@@ -67,6 +89,7 @@ const STEPS: Step[] = [
     title: 'What do you sell?',
     subtitle: 'Pick everything that fits.',
     groups: PRODUCT,
+    collapseTo: 6,
   },
   {
     id: 'location',
@@ -87,6 +110,7 @@ const STEPS: Step[] = [
     title: 'What do you have?',
     subtitle: 'Tap everything you could use.',
     groups: ASSETS,
+    featured: ASSETS_FEATURED,
   },
   {
     id: 'skills',
@@ -97,11 +121,18 @@ const STEPS: Step[] = [
     collapseTo: 4,
   },
   {
+    id: 'loves',
+    kind: 'loves',
+    title: 'What would you love your business to be about?',
+    subtitle: 'Kisa builds around what makes you happy — like doing more vibe coding.',
+  },
+  {
     id: 'languages',
     kind: 'multi',
     title: 'Which languages do you speak?',
     subtitle: 'More languages, more customers.',
     groups: LANGUAGES,
+    featured: LANGUAGES_FEATURED,
   },
   {
     id: 'workStyle',
@@ -119,6 +150,7 @@ function answersFrom(intake: Intake | null): Answers {
     budget: intake?.budget ? [intake.budget] : [],
     assets: intake?.assets ?? [],
     skills: intake?.skills ?? [],
+    loves: intake?.loves ?? [],
     languages: intake?.languages ?? [],
     workStyle: intake?.workStyle ? [intake.workStyle] : [],
   };
@@ -145,15 +177,22 @@ export default function OnboardingScreen() {
   const step = steps[index];
   const inGeorgia = /georgia|საქართველო|tbilisi|batumi|kutaisi|rustavi/i.test(location.label);
 
+  // JS driver on purpose: with the native driver, Android (new arch) keeps hit-testing the
+  // pre-animation position, so the Continue button sometimes ignores taps.
   useEffect(() => {
     anim.setValue(0);
     Animated.timing(anim, {
       toValue: 1,
-      duration: 280,
+      duration: 240,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: native,
+      useNativeDriver: false,
     }).start();
   }, [index, anim]);
+
+  const advancing = useRef(false);
+  useEffect(() => {
+    advancing.current = false;
+  }, [index]);
 
   const finish = (final: Answers) => {
     const intake: Intake = {
@@ -165,6 +204,7 @@ export default function OnboardingScreen() {
       budget: final.budget[0] ?? '',
       assets: final.assets,
       skills: final.skills,
+      loves: final.loves.filter((v) => final.skills.includes(v) || final.assets.includes(v) || !ALL_OPTIONS.some((o) => (o.value ?? o.label) === v)),
       languages: final.languages,
       workStyle: final.workStyle[0] ?? 'Anything works',
     };
@@ -174,9 +214,13 @@ export default function OnboardingScreen() {
   };
 
   const next = (final = answers) => {
+    if (advancing.current) return;
+    advancing.current = true;
     direction.current = 1;
-    if (index >= steps.length - 1) finish(final);
-    else setIndex((i) => i + 1);
+    if (index >= steps.length - 1) {
+      finish(final);
+      setTimeout(() => (advancing.current = false), 800);
+    } else setIndex((i) => i + 1);
   };
 
   const back = () => {
@@ -235,10 +279,22 @@ export default function OnboardingScreen() {
               options={step.options(inGeorgia)}
               selected={answers[step.id]}
               onPick={(value) => {
+                if (advancing.current) return;
                 const updated = { ...answers, [step.id]: [value] };
                 setAnswers(updated);
-                setTimeout(() => next(updated), 260);
+                setTimeout(() => next(updated), 200);
               }}
+            />
+          ) : step.kind === 'loves' ? (
+            <MultiStep
+              key={step.id}
+              head={head}
+              groups={loveGroups(answers)}
+              selected={answers.loves}
+              onChange={(values) => setAnswers({ ...answers, loves: values })}
+              onContinue={() => next()}
+              allowCustom
+              optional
             />
           ) : (
             <MultiStep
@@ -246,6 +302,7 @@ export default function OnboardingScreen() {
               head={head}
               groups={step.groups}
               collapseTo={step.collapseTo}
+              featured={step.featured}
               selected={answers[step.id]}
               onChange={(values) => setAnswers({ ...answers, [step.id]: values })}
               onContinue={() => next()}
@@ -298,25 +355,35 @@ function MultiStep({
   head,
   groups,
   collapseTo,
+  featured,
   selected,
   onChange,
   onContinue,
   allowCustom,
+  optional,
 }: {
   head: ReactNode;
   groups: OptionGroup[];
   collapseTo?: number;
+  featured?: string[];
   selected: string[];
   onChange: (values: string[]) => void;
   onContinue: () => void;
   allowCustom: boolean;
+  /** Continue is allowed with nothing picked. */
+  optional?: boolean;
 }) {
   const [customOpen, setCustomOpen] = useState(false);
   const [custom, setCustom] = useState('');
   const allOptions = groups.flatMap((g) => g.options);
-  const canCollapse = !!collapseTo && allOptions.length > collapseTo;
+  const top = featured
+    ? allOptions.filter((o) => featured.includes(o.value ?? o.label))
+    : collapseTo
+      ? allOptions.slice(0, collapseTo)
+      : allOptions;
+  const canCollapse = allOptions.length > top.length;
   const [expanded, setExpanded] = useState(
-    () => canCollapse && selected.some((v) => !allOptions.slice(0, collapseTo).some((o) => (o.value ?? o.label) === v)),
+    () => canCollapse && selected.some((v) => !top.some((o) => (o.value ?? o.label) === v)),
   );
   const known = new Set(allOptions.map((o) => o.value ?? o.label));
   const customValues = selected.filter((v) => !known.has(v));
@@ -332,9 +399,7 @@ function MultiStep({
     canCollapse && !expanded
       ? [
           {
-            options: allOptions.filter(
-              (o, i) => i < collapseTo! || selected.includes(o.value ?? o.label),
-            ),
+            options: allOptions.filter((o) => top.includes(o) || selected.includes(o.value ?? o.label)),
           },
         ]
       : groups;
@@ -378,7 +443,7 @@ function MultiStep({
 
         {canCollapse ? (
           <Pressable onPress={toggleExpanded} style={styles.moreBtn} accessibilityRole="button">
-            <Text style={styles.moreText}>{expanded ? 'Show less' : `Show ${allOptions.length - collapseTo!} more`}</Text>
+            <Text style={styles.moreText}>{expanded ? 'Show less' : `Show ${allOptions.length - top.length} more`}</Text>
             <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.white} />
           </Pressable>
         ) : null}
@@ -418,10 +483,10 @@ function MultiStep({
 
       <View style={styles.footer}>
         <PrimaryButton
-          label={selected.length ? `Continue · ${selected.length}` : 'Pick at least one'}
+          label={selected.length ? `Continue · ${selected.length}` : optional ? 'Any of them is fine' : 'Pick at least one'}
           onPress={onContinue}
-          disabled={selected.length === 0}
-          chevron={selected.length > 0}
+          disabled={!optional && selected.length === 0}
+          chevron={selected.length > 0 || !!optional}
         />
       </View>
     </View>

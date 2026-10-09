@@ -45,8 +45,12 @@ export const ASSETS: OptionGroup[] = [
       { icon: 'desktop', label: 'Powerful PC' },
       { icon: 'tablet-portrait', label: 'Tablet' },
       { icon: 'aperture', label: 'Good camera' },
+      { icon: 'videocam', label: 'Drone' },
       { icon: 'mic', label: 'Mic & audio gear' },
+      { icon: 'volume-high', label: 'Speakers / DJ gear' },
+      { icon: 'tv', label: 'Projector' },
       { icon: 'print', label: 'Printer' },
+      { icon: 'cube', label: '3D printer' },
       { icon: 'game-controller', label: 'Gaming setup' },
     ],
   },
@@ -54,33 +58,107 @@ export const ASSETS: OptionGroup[] = [
     title: 'Getting around',
     options: [
       { icon: 'car-sport', label: 'Car' },
+      { icon: 'bus', label: 'Van or truck' },
+      { icon: 'speedometer', label: 'Motorbike' },
       { icon: 'bicycle', label: 'Bike or scooter' },
+      { icon: 'card', label: 'Driving license' },
     ],
   },
   {
-    title: 'Home & tools',
+    title: 'Home & kitchen',
     options: [
       { icon: 'restaurant', label: 'Kitchen' },
       { icon: 'flame', label: 'Oven & baking gear' },
-      { icon: 'hammer', label: 'Tools' },
-      { icon: 'cut', label: 'Sewing machine' },
+      { icon: 'snow', label: 'Big freezer' },
+      { icon: 'water', label: 'Washing machine' },
       { icon: 'sparkles', label: 'Cleaning gear' },
-      { icon: 'home', label: 'Spare room' },
-      { icon: 'cube', label: 'Garage / storage' },
-      { icon: 'leaf', label: 'Garden or yard' },
-      { icon: 'musical-notes', label: 'Instrument' },
-      { icon: 'barbell', label: 'Sports gear' },
+      { icon: 'cut', label: 'Sewing machine' },
     ],
   },
   {
-    title: 'People',
+    title: 'Tools & gear',
+    options: [
+      { icon: 'hammer', label: 'Tools' },
+      { icon: 'construct', label: 'Power tools' },
+      { icon: 'leaf', label: 'Lawn mower & garden tools' },
+      { icon: 'color-palette', label: 'Art & craft supplies' },
+      { icon: 'musical-notes', label: 'Instrument' },
+      { icon: 'barbell', label: 'Sports gear' },
+      { icon: 'bonfire', label: 'Camping gear' },
+      { icon: 'balloon', label: 'Party & event supplies' },
+    ],
+  },
+  {
+    title: 'Space & property',
+    options: [
+      { icon: 'home', label: 'Spare room' },
+      { icon: 'bed', label: 'Apartment to rent out' },
+      { icon: 'cube', label: 'Garage / storage' },
+      { icon: 'car', label: 'Parking spot' },
+      { icon: 'leaf', label: 'Garden or yard' },
+      { icon: 'sunny', label: 'Balcony or rooftop' },
+      { icon: 'map', label: 'Land or a plot' },
+      { icon: 'trail-sign', label: 'Country / summer house' },
+      { icon: 'storefront', label: 'Shop or stall space' },
+    ],
+  },
+  {
+    title: 'Things to sell',
+    options: [
+      { icon: 'shirt', label: 'Clothes I don’t wear' },
+      { icon: 'book', label: 'Books' },
+      { icon: 'albums', label: 'Furniture' },
+      { icon: 'phone-portrait-outline', label: 'Old electronics' },
+      { icon: 'gift', label: 'Kids’ toys & clothes' },
+      { icon: 'diamond', label: 'Collectibles & vintage' },
+      { icon: 'nutrition', label: 'Fruit, veg or honey I grow' },
+    ],
+  },
+  {
+    title: 'Animals',
+    options: [
+      { icon: 'paw', label: 'Pets' },
+      { icon: 'egg', label: 'Chickens or farm animals' },
+      { icon: 'flower', label: 'Beehives' },
+    ],
+  },
+  {
+    title: 'Papers & experience',
+    options: [
+      { icon: 'school', label: 'University degree' },
+      { icon: 'ribbon', label: 'Professional certificate' },
+      { icon: 'medkit', label: 'Medical or care training' },
+      { icon: 'briefcase', label: 'Years in a trade or job' },
+      { icon: 'document-text', label: 'Registered business / IE' },
+    ],
+  },
+  {
+    title: 'People & time',
     options: [
       { icon: 'logo-instagram', label: 'Social media followers' },
       { icon: 'people', label: 'Lots of friends & contacts' },
+      { icon: 'business', label: 'Local business contacts' },
+      { icon: 'person-add', label: 'Clients from a past job' },
+      { icon: 'people-circle', label: 'Family who can help' },
       { icon: 'time', label: 'Free time every day' },
+      { icon: 'moon', label: 'Evenings & weekends' },
     ],
   },
 ];
+
+/** What most people have; the rest stays behind "Show more". */
+export const ASSETS_FEATURED = [
+  'Smartphone',
+  'Laptop',
+  'Car',
+  'Kitchen',
+  'Tools',
+  'Spare room',
+  'Social media followers',
+  'Free time every day',
+];
+
+export const LANGUAGES_FEATURED = ['Georgian', 'English', 'Russian', 'Turkish', 'Armenian', 'Azerbaijani'];
 
 export const SKILLS: OptionGroup[] = [
   {

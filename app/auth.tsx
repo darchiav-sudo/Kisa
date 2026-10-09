@@ -14,6 +14,10 @@ export default function AuthRedirectScreen() {
   const { code } = useLocalSearchParams<{ code?: string }>();
 
   useEffect(() => {
+    // Android leaves the sign-in tab open over the app when the redirect arrives this way.
+    try {
+      void WebBrowser.dismissBrowser().catch(() => undefined);
+    } catch {}
     let alive = true;
     const leave = () => {
       if (!alive) return;

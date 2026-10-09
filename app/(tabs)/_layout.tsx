@@ -4,7 +4,9 @@ import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Badge } from '@/src/components/Sheet';
 import { IconName, tap } from '@/src/components/ui';
+import { useUpdates } from '@/src/store/useAppStore';
 import { useNotificationRouting } from '@/src/lib/notifications';
 import { colors } from '@/src/theme/colors';
 
@@ -24,6 +26,7 @@ function KisaTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const current = state.routes[state.index]?.name ?? '';
   const activeTab = PARENT[current] ?? current;
+  const updates = useUpdates();
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
       <View style={styles.bar}>
@@ -47,7 +50,10 @@ function KisaTabBar({ state, navigation }: BottomTabBarProps) {
               accessibilityLabel={tab.label}
               style={styles.item}
             >
-              <Ionicons name={focused ? tab.iconOn : tab.icon} size={22} color={focused ? colors.white : colors.muted} />
+              <View>
+                <Ionicons name={focused ? tab.iconOn : tab.icon} size={22} color={focused ? colors.white : colors.muted} />
+                {route.name === 'index' && updates.total ? <Badge count={updates.total} style={styles.badge} /> : null}
+              </View>
               <Text style={[styles.label, focused && styles.labelOn]}>{tab.label}</Text>
             </Pressable>
           );
@@ -93,4 +99,5 @@ const styles = StyleSheet.create({
   item: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
   label: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: 3 },
   labelOn: { color: colors.white, fontWeight: '800' },
+  badge: { position: 'absolute', top: -6, right: -12 },
 });

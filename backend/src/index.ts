@@ -7,8 +7,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { registerAuthRoutes, type AppEnv } from './auth.js';
+import { registerAutopilotRoutes, startAutopilot } from './autopilot.js';
 import { registerBusinessRoutes } from './business.js';
+import { registerChannelRoutes, startTelegram } from './channels.js';
 import { getSql } from './db/client.js';
+import { registerGapRoutes } from './gaps.js';
 import { registerPushRoutes } from './push.js';
 import { registerSiteRoutes } from './site.js';
 
@@ -39,11 +42,15 @@ app.get('/health', (c) =>
 registerSiteRoutes(app);
 registerAuthRoutes(app);
 registerBusinessRoutes(app);
+registerAutopilotRoutes(app);
+registerGapRoutes(app);
+registerChannelRoutes(app);
 registerPushRoutes(app);
 
 app.onError((err, c) => {
   console.error(err);
   if (err.name === 'ZodError') return c.json({ error: 'Invalid request' }, 400);
+  if (err.name === 'AiBudgetError') return c.json({ error: err.message }, 429);
   return c.json({ error: err.message || 'Server error' }, 500);
 });
 
@@ -68,6 +75,8 @@ async function boot() {
   serve({ fetch: app.fetch, port }, (info) => {
     console.log(`Kisa API listening on :${info.port}`);
   });
+  startAutopilot();
+  void startTelegram();
 }
 
 boot();

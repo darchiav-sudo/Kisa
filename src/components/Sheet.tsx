@@ -10,6 +10,8 @@ export type SheetAction = {
   label: string;
   icon?: IconName;
   destructive?: boolean;
+  /** Unread count shown next to the label. */
+  badge?: number;
   onPress: () => void | Promise<void>;
 };
 
@@ -93,6 +95,7 @@ export function SheetHost() {
                     <Ionicons name={a.icon} size={19} color={a.destructive ? colors.danger : colors.white} />
                   ) : null}
                   <Text style={[styles.actionText, a.destructive && { color: colors.danger }]}>{a.label}</Text>
+                  {a.badge ? <Badge count={a.badge} /> : null}
                 </Pressable>
               ))}
               <Pressable onPress={() => close()} style={({ pressed }) => [styles.cancel, pressed && { opacity: 0.7 }]}>
@@ -106,7 +109,25 @@ export function SheetHost() {
   );
 }
 
+export function Badge({ count, style }: { count: number; style?: object }) {
+  return (
+    <View style={[styles.badge, style]}>
+      <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.blueBright,
+  },
+  badgeText: { color: colors.white, fontSize: 11, fontWeight: '800' },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
     position: 'absolute',

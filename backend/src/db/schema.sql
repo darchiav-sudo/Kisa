@@ -180,6 +180,81 @@ CREATE TABLE IF NOT EXISTS idea_searches (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS autopilot_at TIMESTAMPTZ;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS scouted_at TIMESTAMPTZ;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS site_tuned_at TIMESTAMPTZ;
+ALTER TABLE business_leads ADD COLUMN IF NOT EXISTS status_at TIMESTAMPTZ;
+ALTER TABLE business_leads ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMPTZ;
+ALTER TABLE business_leads ADD COLUMN IF NOT EXISTS followup_draft TEXT;
+
+CREATE TABLE IF NOT EXISTS agent_log (
+  id BIGSERIAL PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  task TEXT NOT NULL,
+  model TEXT NOT NULL,
+  source TEXT,
+  user_id TEXT,
+  business_id TEXT,
+  input_tokens INT NOT NULL DEFAULT 0,
+  cached_tokens INT NOT NULL DEFAULT 0,
+  output_tokens INT NOT NULL DEFAULT 0,
+  reasoning_tokens INT NOT NULL DEFAULT 0,
+  searches INT NOT NULL DEFAULT 0,
+  ms INT NOT NULL DEFAULT 0,
+  cost_usd NUMERIC(12, 6) NOT NULL DEFAULT 0,
+  error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS gap_hunts (
+  key TEXT PRIMARY KEY,
+  location TEXT NOT NULL,
+  gaps JSONB NOT NULL,
+  notes TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS test_reported_at TIMESTAMPTZ;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS payment JSONB;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS auto_reply BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS telegram_channel JSONB;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS telegram_code TEXT;
+ALTER TABLE business_leads ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'site';
+ALTER TABLE business_leads ADD COLUMN IF NOT EXISTS channel_ref TEXT;
+
+CREATE TABLE IF NOT EXISTS lead_messages (
+  id BIGSERIAL PRIMARY KEY,
+  lead_id TEXT NOT NULL REFERENCES business_leads(id) ON DELETE CASCADE,
+  direction TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE lead_messages ADD COLUMN IF NOT EXISTS tg_message_id BIGINT;
+
+CREATE TABLE IF NOT EXISTS telegram_chats (
+  chat_id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_messages_lead ON lead_messages(lead_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_leads_channel_ref ON business_leads(channel, channel_ref, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_businesses_telegram_code ON businesses(telegram_code) WHERE telegram_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_ai_usage_created ON ai_usage(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_user ON ai_usage(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_log_business ON agent_log(business_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_businesses_autopilot ON businesses(status, autopilot_at);
 CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_money_business ON business_money(business_id, kind);

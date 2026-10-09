@@ -30,6 +30,7 @@ export const IntakeSchema = z.object({
   budget: z.string().trim().max(100),
   assets: z.array(z.string().trim().max(100)).max(40),
   skills: z.array(z.string().trim().max(100)).max(40),
+  loves: z.array(z.string().trim().max(100)).max(20).optional(),
   languages: z.array(z.string().trim().max(60)).max(10),
   workStyle: z.string().trim().max(100),
 });
@@ -52,6 +53,8 @@ export const IdeaSchema = z.object({
     .catch([]),
   handsOff: z.boolean().optional().catch(undefined),
   yourPart: optStr,
+  /** Set when the idea came from the opportunity hunt: the gap it fills, tested for 48 hours. */
+  gap: z.object({ kind: z.string(), missing: z.string() }).optional().catch(undefined),
   researchNotes: z.string().max(20000).optional(),
 });
 export type Idea = z.infer<typeof IdeaSchema>;
@@ -125,10 +128,19 @@ export const KitSchema = z.object({
     .catch([]),
   learn: z.array(z.object({ term: z.string().trim(), explain: z.string().trim() })).catch([]),
   firstTasks: z.array(TaskDraftSchema).min(1),
+  /** Filled in later by the weekly scout: who else sells this nearby and for how much. */
+  market: z
+    .object({
+      summary: z.string().trim(),
+      competitors: z.array(z.object({ name: z.string().trim(), price: optStr, url: optUrl })).catch([]),
+      checkedAt: z.string(),
+    })
+    .optional()
+    .catch(undefined),
 });
 export type Kit = z.infer<typeof KitSchema>;
 
-const RULES = `Rules:
+export const RULES = `Rules:
 - The user is a beginner who has never run a business. Explain things in one plain sentence.
 - Never invent demand numbers, reviews, or guaranteed income. Prices are test offers.
 - No spend before signal: buying equipment or ads only after a real order.
@@ -164,7 +176,7 @@ const COUNTRY_CODES: Record<string, string> = {
 };
 
 /** Where web search should be localized. Prefers the device's reverse-geocoded area. */
-function searchLocation(intake: Intake): SearchLocation {
+export function searchLocation(intake: Intake): SearchLocation {
   const parts = intake.location.split(',').map((p) => p.trim()).filter(Boolean);
   const fromLabel = COUNTRY_CODES[(parts.at(-1) ?? '').toLowerCase()];
   const inGeorgia = /tbilisi|batumi|kutaisi|rustavi|georgia|საქართველო/i.test(intake.location);
@@ -210,7 +222,7 @@ export function marketFor(intake: Intake) {
   };
 }
 
-function intakeText(intake: Intake) {
+export function intakeText(intake: Intake) {
   const { coords: _coords, area: _area, ...rest } = intake;
   return JSON.stringify({ ...rest, market: marketFor(intake), today: new Date().toISOString().slice(0, 10) });
 }
@@ -227,10 +239,14 @@ export function researchKey(intake: Intake, mode: IdeaMode) {
     budget: intake.budget,
     assets: norm(intake.assets),
     skills: norm(intake.skills),
+    loves: norm(intake.loves ?? []),
     languages: norm(intake.languages),
     workStyle: intake.workStyle,
   });
 }
+
+const LOVES_RULE = `If the intake has "loves", those are what the person would be happiest doing: every candidate should be built
+around at least one of them (still easy to start and earning fast). If "loves" is missing or empty, any fit is fine.`;
 
 /** How many distinct candidates one research pass covers; "Another idea" reuses it until they run out. */
 export const CANDIDATES_PER_RESEARCH = 3;
@@ -239,6 +255,7 @@ const RESEARCH_INSTRUCTIONS = `You are a local market researcher helping a begin
 Pick ${CANDIDATES_PER_RESEARCH} clearly different candidate tiny businesses this exact person could start this week
 (or, for a person who already sells something, ${CANDIDATES_PER_RESEARCH} different ways to sell it), using what they have,
 what they are good at and the languages they speak. Online services with remote clients are fine if their skills are online skills.
+${LOVES_RULE}
 For EACH candidate collect concrete, current facts: real local demand signals (season, events, what people pay for),
 typical local prices, real places in that city where BUYERS of this service/product look or ask (named local Facebook
 groups, marketplaces, classifieds, Telegram channels, apps that operate there — with URLs; not job-seeker boards
@@ -257,6 +274,7 @@ Use web search. Find ${CANDIDATES_PER_RESEARCH} clearly different tiny businesse
 and the person needs about 10–15 minutes a day: mostly digital products or done-for-you services that Kisa produces
 (e.g. writing, translating, CVs, menus, social posts for local shops, listings, printables), sold to buyers in the
 person's city or online. Legal and honest only: no spam, no fake reviews, no hiding that AI helped where that matters.
+${LOVES_RULE}
 For EACH candidate collect concrete, current facts: who pays for this and how much (real prices), where those buyers
 are (named groups, marketplaces, directories — with URLs), and what the person would still have to do.
 Write compact plain-text notes grouped under a heading per candidate, with source name and URL for each fact.
@@ -267,7 +285,7 @@ export async function researchMarket(intake: Intake, exclude: string[], mode: Id
     mode === 'hands-off' ? HANDS_OFF_RESEARCH : RESEARCH_INSTRUCTIONS,
     `User intake: ${intakeText(intake)}
 ${exclude.length ? `Skip these, the user already rejected them: ${exclude.join('; ')}` : ''}`,
-    { location: searchLocation(intake) },
+    { task: mode === 'hands-off' ? 'research-hands-off' : 'research-idea', location: searchLocation(intake), maxSearches: 4 },
   );
 }
 
@@ -282,6 +300,7 @@ const IDEA_JSON = `Return JSON:
 const IDEA_SYSTEM = `You are Kisa, an AI business partner. From the research notes, pick ONE tiny business for this user —
 the EASIEST one to start this week that earns first money fastest with the least risk, fitting their budget, assets,
 skills and location. Assume a beginner with a few spare hours a day unless the intake says otherwise.
+${LOVES_RULE}
 Never pick anything from the "already rejected" list; pick a clearly different business instead.
 ${RULES}
 ${IDEA_JSON}`;
@@ -289,6 +308,7 @@ ${IDEA_JSON}`;
 const HANDS_OFF_IDEA_SYSTEM = `You are Kisa, an AI business partner. ${KISA_CAN}
 From the research notes, pick ONE tiny business that Kisa can run almost entirely, where the person's part is about
 10–15 minutes a day, and that can earn first money fastest with the least risk. Say plainly in "yourPart" what is left.
+${LOVES_RULE}
 Never pick anything from the "already rejected" list; pick a clearly different business instead.
 ${RULES}
 ${IDEA_JSON}`;
@@ -298,13 +318,15 @@ export async function composeIdea(
   exclude: string[],
   notes: string | null,
   mode: IdeaMode = 'hands-on',
+  focus?: string,
 ): Promise<Idea> {
   const handsOff = mode === 'hands-off';
   const idea = await composeJson(
-    IdeaSchema.omit({ researchNotes: true }),
+    IdeaSchema.omit({ researchNotes: true, gap: true }),
     handsOff ? HANDS_OFF_IDEA_SYSTEM : IDEA_SYSTEM,
     `User intake: ${intakeText(intake)}
 ${exclude.length ? `Already rejected: ${exclude.join('; ')}` : ''}
+${focus ? `The user chose this exact opportunity — build the idea around it, use its evidence:\n${focus}\n` : ''}
 
 ${notes ? `Web research notes:\n${notes}` : 'No live research available; stay conservative.'}`,
     { task: handsOff ? 'idea-hands-off' : 'idea' },
@@ -430,6 +452,7 @@ function kitBrief(kit: Kit) {
     language: kit.website.language,
     offer: { title: kit.offer.title, price: kit.offer.price, unit: kit.offer.unit, includes: kit.offer.includes },
     channels: kit.channels.map((c) => ({ name: c.name, url: c.url })),
+    priceCheck: kit.market?.summary,
   };
 }
 
@@ -487,17 +510,145 @@ const REPLY_SYSTEM = `You are Kisa, writing a reply for a beginner business owne
 Write in the language the customer used (default: the business website language). Friendly, short,
 confirm what they asked, state the price from the offer, ask the one question needed to book, propose a time.
 At most 5 short lines. Plain text only — no markdown, no asterisks; it is pasted into a chat app.
+If there is a conversation, answer the customer's LATEST message and move toward a booked, paid order.
+When the customer has agreed (or asks how to pay) and "payment" is given, include exactly those payment details.
+Never invent payment details, availability you were not told, or discounts beyond the offer.
 Output only the message text.`;
+
+export type ChatTurn = { from: 'customer' | 'you'; text: string };
+export type Payment = { link?: string; details?: string };
 
 export async function draftLeadReply(input: {
   kit: Kit;
   siteUrl: string;
   lead: { name: string; contact: string; message: string };
+  conversation?: ChatTurn[];
+  payment?: Payment | null;
 }) {
   return composeText(
     REPLY_SYSTEM,
-    JSON.stringify({ business: kitBrief(input.kit), siteUrl: input.siteUrl, lead: input.lead }),
+    JSON.stringify({
+      business: kitBrief(input.kit),
+      siteUrl: input.siteUrl,
+      lead: input.lead,
+      conversation: input.conversation?.slice(-12),
+      payment: input.payment ?? undefined,
+    }),
     { task: 'reply', model: fastModel() },
+  );
+}
+
+const FOLLOWUP_SYSTEM = `You are Kisa, writing a short follow-up for a beginner business owner. They replied to a customer
+a day or more ago and heard nothing back. Write a friendly, low-pressure nudge in the customer's language (default: the
+business website language): remind what they asked, offer one concrete time or a tiny incentive if it fits the offer,
+and make saying yes easy. At most 3 short lines. Plain text only, no markdown. Output only the message text.`;
+
+export async function draftFollowUp(input: {
+  kit: Kit;
+  lead: { name: string; message: string };
+  reply?: string;
+}) {
+  return composeText(
+    FOLLOWUP_SYSTEM,
+    JSON.stringify({ business: kitBrief(input.kit), lead: input.lead, yourLastReply: input.reply }),
+    { task: 'followup', model: fastModel() },
+  );
+}
+
+const SiteTuneSchema = z.object({
+  why: z.string().trim(),
+  headline: z.string().trim().min(1),
+  subheadline: z.string().trim(),
+  bullets: strList,
+  cta: z.string().trim(),
+  offerTitle: z.string().trim(),
+  offerDescription: z.string().trim(),
+  price: z.number().positive(),
+});
+export type SiteTune = z.infer<typeof SiteTuneSchema>;
+
+const SITE_TUNE_SYSTEM = `You are Kisa, a conversion expert. People open this tiny business's website but don't order.
+Rewrite the page so more visitors order today. Keep the same business and honest claims (no fake reviews, no invented
+numbers). Typical fixes: a sharper headline that names the customer and the result, a smaller and cheaper first order
+(a "starter" or "trial" offer) so trying is easy, concrete bullets (what they get, how fast, where), a direct CTA.
+Lower the price only if competitors are cheaper or the offer feels big for a first try; never by more than 30%.
+All customer-facing text in the website's language. "why" is one plain English sentence for the owner.
+Return JSON: { "why": "...", "headline": "...", "subheadline": "...", "bullets": ["3-4"], "cta": "...",
+  "offerTitle": "...", "offerDescription": "...", "price": number }`;
+
+export async function tuneWebsite(input: {
+  intake: Intake;
+  kit: Kit;
+  visits: { total: number; week: number };
+  orders: number;
+}) {
+  const { kit } = input;
+  return composeJson(
+    SiteTuneSchema,
+    SITE_TUNE_SYSTEM,
+    JSON.stringify({
+      market: marketFor(input.intake),
+      visits: input.visits,
+      orders: input.orders,
+      website: kit.website,
+      offer: kit.offer,
+      competitors: kit.market?.competitors ?? [],
+    }),
+    { task: 'site-tune' },
+  );
+}
+
+const SCOUT_RESEARCH = `You are a market scout for a tiny local business. Use web search. Find, for this exact business and city:
+1) NEW places where its buyers look or ask right now — named local Facebook groups, subreddits, Telegram channels,
+   marketplace categories, community boards, directories (with URLs; not the ones already listed, not job boards);
+2) 3–5 real competitors nearby or online selling the same thing, with their current prices and URLs
+   (re-check prices of knownCompetitors only if you pass them anyway; spend searches on what is new).
+Write compact plain-text notes with source name and URL for each fact. Never invent anything.
+Be efficient: at most 3 targeted searches, no filler.`;
+
+const ScoutSchema = z.object({
+  summary: z.string().trim(),
+  channels: z
+    .array(z.object({ name: z.string().trim(), url: optUrl, why: z.string().trim(), postText: z.string().trim() }))
+    .catch([]),
+  competitors: z
+    .array(
+      z.object({
+        name: z.string().trim(),
+        price: optStr.transform((p) => (p && /\d/.test(p) ? p : undefined)),
+        url: optUrl,
+      }),
+    )
+    .catch([]),
+});
+
+const SCOUT_SYSTEM = `You are Kisa. From the scout notes, return new places to post and the competitor picture.
+${RULES}
+channels: up to 3 NEW places (not in business.channels) with a ready-to-post text in the customer language that ends with
+the website link {{SITE_URL}}. competitors: the real ones found, with price as written in the source.
+summary: one plain English sentence comparing our price with competitors (e.g. "Others charge $50–70; your $45 is the cheapest.").
+Return JSON: { "summary": "...", "channels": [{ "name": "...", "url": "https://...", "why": "...", "postText": "..." }],
+  "competitors": [{ "name": "...", "price": "...", "url": "https://..." }] }`;
+
+export async function scoutMarket(input: { intake: Intake; kit: Kit }) {
+  const brief = kitBrief(input.kit);
+  const notes = await research(
+    SCOUT_RESEARCH,
+    JSON.stringify({
+      business: brief,
+      offer: { title: input.kit.offer.title, price: input.kit.offer.price, unit: input.kit.offer.unit },
+      location: input.intake.location,
+      market: marketFor(input.intake),
+      knownCompetitors: input.kit.market?.competitors.map((c) => c.name) ?? [],
+    }),
+    { task: 'research-scout', location: searchLocation(input.intake), maxSearches: 3 },
+  );
+  if (!notes) return null;
+  return composeJson(
+    ScoutSchema,
+    SCOUT_SYSTEM,
+    JSON.stringify({ business: brief, market: marketFor(input.intake), notes }),
+    { task: 'scout' },
   );
 }
 

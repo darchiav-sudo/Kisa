@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
 
+import { checkBudget, recordUsage } from './usage.js';
+
 let client: OpenAI | null = null;
 
 export function openai() {
@@ -20,40 +22,19 @@ export function fastModel() {
   return process.env.OPENAI_FAST_MODEL || 'gpt-5.4-nano';
 }
 
-type Usage = {
-  input_tokens?: number;
-  output_tokens?: number;
-  input_tokens_details?: { cached_tokens?: number };
-  output_tokens_details?: { reasoning_tokens?: number };
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  prompt_tokens_details?: { cached_tokens?: number };
-  completion_tokens_details?: { reasoning_tokens?: number };
-};
-
-function logUsage(task: string, modelName: string, startedAt: number, usage?: Usage | null, extra = '') {
-  const u = usage ?? {};
-  console.log(
-    `[ai] ${task} model=${modelName} ms=${Date.now() - startedAt}` +
-      ` in=${u.input_tokens ?? u.prompt_tokens ?? 0}` +
-      ` cached=${u.input_tokens_details?.cached_tokens ?? u.prompt_tokens_details?.cached_tokens ?? 0}` +
-      ` out=${u.output_tokens ?? u.completion_tokens ?? 0}` +
-      ` reasoning=${u.output_tokens_details?.reasoning_tokens ?? u.completion_tokens_details?.reasoning_tokens ?? 0}` +
-      (extra ? ` ${extra}` : ''),
-  );
-}
-
 export type SearchLocation = { country?: string; city?: string; region?: string };
 
 /**
  * Web-search research pass. Returns plain-text notes with sources, or null if search is unavailable.
  * Without `user_location` OpenAI localizes search to the United States, so always pass one.
+ * Searches are the most expensive part of Kisa ($0.01 each plus the page text they pull in), so cap them.
  */
 export async function research(
   instructions: string,
   input: string,
-  opts: { location?: SearchLocation; maxSearches?: number } = {},
+  opts: { task: string; location?: SearchLocation; maxSearches: number },
 ): Promise<string | null> {
+  await checkBudget();
   const userLocation = { type: 'approximate' as const, ...opts.location };
   for (const tool of ['web_search', 'web_search_preview'] as const) {
     const started = Date.now();
@@ -63,14 +44,14 @@ export async function research(
         tools: [{ type: tool, user_location: userLocation, search_context_size: 'medium' }],
         instructions,
         input,
-        prompt_cache_key: 'kisa-research',
-        ...({ max_tool_calls: opts.maxSearches ?? 5 } as object),
+        prompt_cache_key: `kisa-${opts.task}`,
+        ...({ max_tool_calls: opts.maxSearches } as object),
       });
       const searches = response.output.filter((o) => o.type === 'web_search_call').length;
-      logUsage('research', model(), started, response.usage, `searches=${searches}`);
+      recordUsage({ task: opts.task, model: model(), startedAt: started, usage: response.usage, searches });
       if (response.output_text) return response.output_text;
     } catch (err) {
-      console.warn(`Research with ${tool} failed`, (err as Error).message);
+      recordUsage({ task: opts.task, model: model(), startedAt: started, error: (err as Error).message });
     }
   }
   return null;
@@ -100,6 +81,7 @@ export async function composeJson<T extends z.ZodTypeAny>(
     { role: 'system', content: system },
     { role: 'user', content: user },
   ];
+  await checkBudget();
   for (let attempt = 0; ; attempt++) {
     const started = Date.now();
     const completion = await openai().chat.completions.create({
@@ -108,7 +90,7 @@ export async function composeJson<T extends z.ZodTypeAny>(
       messages,
       prompt_cache_key: `kisa-${opts.task}`,
     });
-    logUsage(opts.task, modelName, started, completion.usage, attempt ? `retry=${attempt}` : '');
+    recordUsage({ task: attempt ? `${opts.task}-retry` : opts.task, model: modelName, startedAt: started, usage: completion.usage });
     const text = completion.choices[0]?.message?.content || '';
     try {
       return schema.parse(extractJson(text));
@@ -127,6 +109,7 @@ export async function composeJson<T extends z.ZodTypeAny>(
 
 export async function composeText(system: string, user: string, opts: ComposeOpts): Promise<string> {
   const modelName = opts.model ?? model();
+  await checkBudget();
   const started = Date.now();
   const completion = await openai().chat.completions.create({
     model: modelName,
@@ -136,7 +119,7 @@ export async function composeText(system: string, user: string, opts: ComposeOpt
     ],
     prompt_cache_key: `kisa-${opts.task}`,
   });
-  logUsage(opts.task, modelName, started, completion.usage);
+  recordUsage({ task: opts.task, model: modelName, startedAt: started, usage: completion.usage });
   return completion.choices[0]?.message?.content?.trim() || '';
 }
 

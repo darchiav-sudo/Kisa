@@ -23,13 +23,14 @@ import {
   type TaskDraft,
 } from './ai/business.js';
 import { publicBaseUrl, type AppEnv } from './auth.js';
+import { businessPayment, leadConversation, telegramBot } from './channels.js';
 import { getSql } from './db/client.js';
 
-function siteUrl(slug: string) {
+export function siteUrl(slug: string) {
   return `${publicBaseUrl()}/b/${slug}`;
 }
 
-function fillSiteUrl<T>(value: T, url: string): T {
+export function fillSiteUrl<T>(value: T, url: string): T {
   return JSON.parse(JSON.stringify(value).replaceAll('{{SITE_URL}}', url)) as T;
 }
 
@@ -42,7 +43,7 @@ function makeSlug(raw: string) {
   return `${base || 'shop'}-${randomBytes(2).toString('hex')}`;
 }
 
-function insertTasksQuery(businessId: string, tasks: TaskDraft[]) {
+export function insertTasksQuery(businessId: string, tasks: TaskDraft[]) {
   const sql = getSql();
   return sql`
     INSERT INTO business_tasks (id, business_id, position, data)
@@ -82,7 +83,7 @@ async function researchNotes(intake: Intake, exclude: string[], mode: IdeaMode) 
   return notes;
 }
 
-async function moneySummary(businessId: string) {
+export async function moneySummary(businessId: string) {
   const sql = getSql();
   const rows = await sql`
     SELECT
@@ -98,7 +99,7 @@ async function moneySummary(businessId: string) {
   };
 }
 
-async function visitSummary(businessId: string) {
+export async function visitSummary(businessId: string) {
   const sql = getSql();
   const rows = await sql`
     SELECT
@@ -110,12 +111,12 @@ async function visitSummary(businessId: string) {
   return { total: Number(rows[0]?.total ?? 0), week: Number(rows[0]?.week ?? 0), today: Number(rows[0]?.today ?? 0) };
 }
 
-async function businessView(businessId: string, userId: string) {
+export async function businessView(businessId: string, userId: string) {
   const sql = getSql();
   // All in parallel; ownership is enforced by the businesses query and checked below.
-  const [rows, tasks, leads, money, visits] = await Promise.all([
+  const [rows, tasks, leads, money, visits, log] = await Promise.all([
     sql`
-      SELECT id, slug, status, intake, idea, kit, coach, created_at
+      SELECT id, slug, status, intake, idea, kit, coach, created_at, payment, auto_reply, telegram_channel
       FROM businesses WHERE id = ${businessId} AND user_id = ${userId}
     `,
     sql`
@@ -124,11 +125,15 @@ async function businessView(businessId: string, userId: string) {
       ORDER BY created_at DESC, position ASC LIMIT 12
     `,
     sql`
-      SELECT id, name, contact, message, status, created_at FROM business_leads
+      SELECT id, name, contact, message, status, followup_draft, channel, created_at FROM business_leads
       WHERE business_id = ${businessId} ORDER BY created_at DESC LIMIT 50
     `,
     moneySummary(businessId),
     visitSummary(businessId),
+    sql`
+      SELECT id, kind, title, detail, created_at FROM agent_log
+      WHERE business_id = ${businessId} ORDER BY created_at DESC LIMIT 8
+    `,
   ]);
   const b = rows[0];
   if (!b) return null;
@@ -158,18 +163,51 @@ async function businessView(businessId: string, userId: string) {
       contact: l.contact,
       message: l.message,
       status: l.status,
+      followUp: l.followup_draft ?? undefined,
+      channel: l.channel,
       createdAt: new Date(l.created_at).toISOString(),
+    })),
+    connections: {
+      telegramBot: telegramBot(),
+      telegramChannel: b.telegram_channel ? { title: b.telegram_channel.title, username: b.telegram_channel.username } : null,
+      autoReply: b.auto_reply,
+      payment: b.payment ?? null,
+    },
+    agentLog: log.map((e) => ({
+      id: String(e.id),
+      kind: e.kind,
+      title: e.title,
+      detail: e.detail ?? undefined,
+      createdAt: new Date(e.created_at).toISOString(),
     })),
   };
 }
 
-async function ownedBusiness(businessId: string, userId: string) {
+export async function ownedBusiness(businessId: string, userId: string) {
   const sql = getSql();
   const rows = await sql`
-    SELECT id, slug, intake, kit FROM businesses WHERE id = ${businessId} AND user_id = ${userId}
+    SELECT ${sql.unsafe(OWNED_COLUMNS)}
+    FROM businesses WHERE id = ${businessId} AND user_id = ${userId}
   `;
-  return rows[0] as { id: string; slug: string; intake: Intake; kit: Kit } | undefined;
+  return rows[0] as OwnedBusiness | undefined;
 }
+
+export const OWNED_COLUMNS =
+  "id, user_id, slug, intake, kit, scouted_at, site_tuned_at, autopilot_at, created_at, test_reported_at, idea->'gap' AS gap";
+
+export type OwnedBusiness = {
+  id: string;
+  user_id: string;
+  slug: string;
+  intake: Intake;
+  kit: Kit;
+  scouted_at: string | null;
+  site_tuned_at: string | null;
+  autopilot_at: string | null;
+  created_at: string;
+  test_reported_at: string | null;
+  gap: { kind: string; missing: string } | null;
+};
 
 export function registerBusinessRoutes(app: Hono<AppEnv>) {
   app.post('/v1/ideas/find', async (c) => {
@@ -205,7 +243,11 @@ export function registerBusinessRoutes(app: Hono<AppEnv>) {
         INSERT INTO businesses (id, user_id, slug, intake, idea, kit, coach)
         VALUES (${id}, ${uid}, ${slug}, ${JSON.stringify(body.intake)}::jsonb,
                 ${JSON.stringify(body.idea)}::jsonb, ${JSON.stringify(filled)}::jsonb,
-                ${'Your business is set up. Do today’s 3 tasks — that’s all for now. Then tell me what happened.'})
+                ${
+                  body.idea.gap
+                    ? 'This is a 48-hour test of a real gap. Share the page with today’s 3 tasks — if people tap Order, the demand is real and we go all in.'
+                    : 'Your business is set up. Do today’s 3 tasks — that’s all for now. Then tell me what happened.'
+                })
       `,
       insertTasksQuery(id, filled.firstTasks),
     ]);
@@ -220,6 +262,8 @@ export function registerBusinessRoutes(app: Hono<AppEnv>) {
       ORDER BY created_at DESC LIMIT 1
     `;
     if (!rows[0]) return c.json({ business: null });
+    // Autopilot only spends AI on businesses whose owner still opens the app.
+    void sql`UPDATE businesses SET last_seen_at = NOW() WHERE id = ${rows[0].id}`.catch(() => undefined);
     return c.json({ business: await businessView(rows[0].id, uid) });
   });
 
@@ -376,13 +420,18 @@ export function registerBusinessRoutes(app: Hono<AppEnv>) {
       })),
     });
 
+    const tasks = await finalizeTasks(plan.tasks, siteUrl(biz.slug));
     await sql.transaction([
       sql`
         UPDATE business_tasks SET status = 'replaced', completed_at = NOW()
         WHERE business_id = ${biz.id} AND status = 'todo'
       `,
-      insertTasksQuery(biz.id, await finalizeTasks(plan.tasks, siteUrl(biz.slug))),
+      insertTasksQuery(biz.id, tasks),
       sql`UPDATE businesses SET coach = ${plan.coach} WHERE id = ${biz.id}`,
+      sql`
+        INSERT INTO agent_log (business_id, kind, title, detail)
+        VALUES (${biz.id}, 'plan', ${`Re-planned after your check-in: ${tasks.length} tasks`}, ${tasks.map((t) => `• ${t.title}`).join('\n')})
+      `,
     ]);
     return c.json({ business: await businessView(biz.id, uid) });
   });
@@ -406,6 +455,86 @@ export function registerBusinessRoutes(app: Hono<AppEnv>) {
     return c.json({ business: await businessView(biz.id, uid) });
   });
 
+  app.get('/v1/businesses/:id/money', async (c) => {
+    const biz = await ownedBusiness(c.req.param('id'), c.get('userId'));
+    if (!biz) return c.json({ error: 'Business not found' }, 404);
+    const sql = getSql();
+    const rows = await sql`
+      SELECT id, kind, amount, label, created_at FROM business_money
+      WHERE business_id = ${biz.id} ORDER BY created_at DESC LIMIT 100
+    `;
+    return c.json({
+      entries: rows.map((m) => ({
+        id: m.id,
+        kind: m.kind,
+        amount: Number(m.amount),
+        label: m.label,
+        createdAt: new Date(m.created_at).toISOString(),
+      })),
+    });
+  });
+
+  app.patch('/v1/businesses/:id/money/:entryId', async (c) => {
+    const uid = c.get('userId');
+    const biz = await ownedBusiness(c.req.param('id'), uid);
+    if (!biz) return c.json({ error: 'Business not found' }, 404);
+    const body = z
+      .object({
+        kind: z.enum(['income', 'expense']).optional(),
+        amount: z.number().positive().optional(),
+        label: z.string().max(200).optional(),
+      })
+      .parse(await c.req.json());
+    const sql = getSql();
+    const [row] = await sql`
+      UPDATE business_money SET
+        kind = COALESCE(${body.kind ?? null}, kind),
+        amount = COALESCE(${body.amount ?? null}::numeric, amount),
+        label = COALESCE(${body.label ?? null}, label)
+      WHERE id = ${c.req.param('entryId')} AND business_id = ${biz.id}
+      RETURNING id
+    `;
+    if (!row) return c.json({ error: 'Entry not found' }, 404);
+    return c.json({ business: await businessView(biz.id, uid) });
+  });
+
+  app.delete('/v1/businesses/:id/money/:entryId', async (c) => {
+    const uid = c.get('userId');
+    const biz = await ownedBusiness(c.req.param('id'), uid);
+    if (!biz) return c.json({ error: 'Business not found' }, 404);
+    const sql = getSql();
+    const [row] = await sql`
+      DELETE FROM business_money WHERE id = ${c.req.param('entryId')} AND business_id = ${biz.id}
+      RETURNING id, kind, amount, label, created_at
+    `;
+    if (!row) return c.json({ error: 'Entry not found' }, 404);
+    return c.json({
+      business: await businessView(biz.id, uid),
+      deleted: { kind: row.kind, amount: Number(row.amount), label: row.label, createdAt: new Date(row.created_at).toISOString() },
+    });
+  });
+
+  /** Puts a deleted entry back exactly as it was (the app's Undo). */
+  app.post('/v1/businesses/:id/money/restore', async (c) => {
+    const uid = c.get('userId');
+    const biz = await ownedBusiness(c.req.param('id'), uid);
+    if (!biz) return c.json({ error: 'Business not found' }, 404);
+    const body = z
+      .object({
+        kind: z.enum(['income', 'expense']),
+        amount: z.number().positive(),
+        label: z.string().max(200),
+        createdAt: z.iso.datetime(),
+      })
+      .parse(await c.req.json());
+    const sql = getSql();
+    await sql`
+      INSERT INTO business_money (id, business_id, kind, amount, label, created_at)
+      VALUES (${`m_${randomUUID().slice(0, 12)}`}, ${biz.id}, ${body.kind}, ${body.amount}, ${body.label}, ${body.createdAt})
+    `;
+    return c.json({ business: await businessView(biz.id, uid) });
+  });
+
   app.patch('/v1/businesses/:id/leads/:leadId', async (c) => {
     const uid = c.get('userId');
     const biz = await ownedBusiness(c.req.param('id'), uid);
@@ -415,7 +544,7 @@ export function registerBusinessRoutes(app: Hono<AppEnv>) {
       .parse(await c.req.json());
     const sql = getSql();
     await sql`
-      UPDATE business_leads SET status = ${status}
+      UPDATE business_leads SET status = ${status}, status_at = NOW()
       WHERE id = ${c.req.param('leadId')} AND business_id = ${biz.id}
     `;
     return c.json({ business: await businessView(biz.id, uid) });
@@ -436,10 +565,13 @@ export function registerBusinessRoutes(app: Hono<AppEnv>) {
     `;
     if (!rows[0]) return c.json({ error: 'Lead not found' }, 404);
     if (rows[0].reply_draft && !fresh) return c.json({ text: rows[0].reply_draft });
+    const [conversation, payment] = await Promise.all([leadConversation(leadId), businessPayment(biz.id)]);
     const text = await draftLeadReply({
       kit: { ...biz.kit, firstTasks: [] },
       siteUrl: siteUrl(biz.slug),
       lead: { name: rows[0].name, contact: rows[0].contact, message: rows[0].message },
+      conversation,
+      payment,
     });
     await sql`UPDATE business_leads SET reply_draft = ${text} WHERE id = ${leadId} AND business_id = ${biz.id}`;
     return c.json({ text });

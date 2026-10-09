@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ComponentProps, ReactNode, useEffect, useRef } from 'react';
+import { ComponentProps, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -266,12 +266,45 @@ export function SecondaryButton({
   );
 }
 
-export function Toast({ message }: { message: string | null }) {
-  if (!message) return null;
+export type ToastState = { message: string; undo?: () => void } | null;
+export type Flash = (message: string, undo?: () => void) => void;
+
+/** Short confirmation; with `undo` it stays longer and offers a one-tap way back. */
+export function useFlash(): [ToastState, Flash] {
+  const [toast, setToast] = useState<ToastState>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => clearTimeout(timer.current ?? undefined), []);
+  const flash = useCallback<Flash>((message, undo) => {
+    clearTimeout(timer.current ?? undefined);
+    setToast({ message, undo });
+    timer.current = setTimeout(() => setToast(null), undo ? 5000 : 1600);
+  }, []);
+  return [toast, flash];
+}
+
+export function Toast({ message, undo }: { message: string | null; undo?: () => void }) {
+  const [gone, setGone] = useState(false);
+  useEffect(() => setGone(false), [message, undo]);
+  if (!message || gone) return null;
   return (
-    <View style={styles.toast} pointerEvents="none">
+    <View style={styles.toast} pointerEvents={undo ? 'box-none' : 'none'}>
       <Ionicons name="checkmark-circle" size={18} color={colors.blueBright} />
-      <Text style={styles.toastText}>{message}</Text>
+      <Text style={styles.toastText} numberOfLines={2}>
+        {message}
+      </Text>
+      {undo ? (
+        <Pressable
+          hitSlop={10}
+          onPress={() => {
+            tap();
+            setGone(true);
+            undo();
+          }}
+          style={styles.toastUndo}
+        >
+          <Text style={styles.toastUndoText}>Undo</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -373,6 +406,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 110,
     alignSelf: 'center',
+    maxWidth: '92%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -383,5 +417,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: radii.pill,
   },
-  toastText: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  toastText: { color: colors.text, fontWeight: '700', fontSize: 14, flexShrink: 1 },
+  toastUndo: { marginLeft: 6, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radii.pill, backgroundColor: colors.white },
+  toastUndoText: { color: colors.black, fontWeight: '800', fontSize: 13 },
 });

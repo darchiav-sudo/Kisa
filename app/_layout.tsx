@@ -113,8 +113,13 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         <Stack.Screen name="building" options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="saved/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="gaps" options={{ headerShown: false }} />
         <Stack.Screen name="business/checkin" options={{ title: 'Check-in', presentation: 'modal' }} />
         <Stack.Screen name="business/kit" options={{ title: 'Business kit' }} />
+        <Stack.Screen name="business/connections" options={{ title: 'Connections' }} />
+        <Stack.Screen name="business/money" options={{ title: 'Money' }} />
+        <Stack.Screen name="business/customers" options={{ title: 'Customers' }} />
+        <Stack.Screen name="business/activity" options={{ title: 'Kisa’s work' }} />
         <Stack.Screen name="business/lead/[id]" options={{ title: 'Order' }} />
       </Stack>
       <SheetHost />

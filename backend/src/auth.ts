@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 
+import { withAiContext } from './ai/usage.js';
 import { getSql } from './db/client.js';
 
 export type AppEnv = { Variables: { userId: string } };
@@ -274,7 +275,9 @@ export function registerAuthRoutes(app: Hono<AppEnv>) {
     const userId = await userIdFromRequest(c);
     if (!userId) return c.json({ error: 'Not signed in' }, 401);
     c.set('userId', userId);
-    await next();
+    const businessId = c.req.path.match(/^\/v1\/businesses\/(biz_[\w-]+)/)?.[1];
+    const source = `${c.req.method} ${c.req.path.replace(/biz_[\w-]+/, ':id').replace(/\/leads\/[\w-]+/, '/leads/:lead')}`;
+    await withAiContext({ source, userId, businessId }, () => next());
   });
 
   app.get('/v1/me', async (c) => {

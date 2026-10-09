@@ -19,6 +19,8 @@ const extra = (Constants.expoConfig?.extra ?? {}) as {
 };
 
 let nativeGoogle: GoogleSigninModule | null | undefined;
+/** Code delivered to the /auth route during the current browser sign-in, if any. */
+let pendingRedirectCode: string | null = null;
 
 /**
  * The native Google account sheet (same as VS dating) needs a development or store build.
@@ -72,11 +74,16 @@ async function signInNative(mod: GoogleSigninModule): Promise<SignInResult> {
 async function signInWithAuthSheet(): Promise<SignInResult> {
   const redirect = Linking.createURL('auth');
   const startUrl = `${apiBase()}/auth/google/start?redirect=${encodeURIComponent(redirect)}`;
+  pendingRedirectCode = null;
   const result = await WebBrowser.openAuthSessionAsync(startUrl, redirect, {
     showInRecents: false,
     createTask: false,
   });
-  if (result.type !== 'success') return { ok: false, cancelled: true };
+  if (result.type !== 'success') {
+    // The /auth route may already have finished this sign-in while the tab was still open.
+    if (pendingRedirectCode) return exchangeCode(pendingRedirectCode);
+    return { ok: false, cancelled: true };
+  }
 
   const { queryParams } = Linking.parse(result.url);
   const code = typeof queryParams?.code === 'string' ? queryParams.code : null;
@@ -94,6 +101,7 @@ const exchanges = new Map<string, Promise<SignInResult>>();
  * (on Android the session sometimes never resolves). Codes are single-use, so share one exchange.
  */
 export function exchangeCode(code: string): Promise<SignInResult> {
+  pendingRedirectCode = code;
   let pending = exchanges.get(code);
   if (!pending) {
     pending = exchangeWithRetry(code);

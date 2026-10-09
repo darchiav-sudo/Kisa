@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { Hono } from 'hono';
 
 import { draftLeadReply, type Kit } from './ai/business.js';
+import { withAiContext } from './ai/usage.js';
 import { publicBaseUrl, type AppEnv } from './auth.js';
+import { businessPayment, telegramBot } from './channels.js';
 import { getSql } from './db/client.js';
 import { sendPush } from './push.js';
 
@@ -41,6 +43,7 @@ function layout(title: string, lang: string, body: string) {
   textarea{min-height:96px}
   button{margin-top:16px;width:100%;padding:15px;border:0;border-radius:999px;background:linear-gradient(135deg,#5b8cff,#3a5bff);color:#fff;box-shadow:0 8px 28px rgba(76,141,255,.45);font-size:17px;font-weight:900}
   .hp{position:absolute;left:-9999px}
+  .tg{display:block;text-align:center;padding:14px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#fff;text-decoration:none;font-weight:800;font-size:16px;background:rgba(42,171,238,.16)}
   footer{color:#64748b;font-size:12px;text-align:center;margin-top:28px}
 </style>
 </head>
@@ -81,11 +84,14 @@ async function onNewLead(
     data: { url: `/business/lead/${lead.id}` },
   });
   try {
-    const text = await draftLeadReply({
-      kit: biz.kit,
-      siteUrl: `${publicBaseUrl()}/b/${biz.slug}`,
-      lead: { name: lead.name, contact: lead.contact, message: lead.message },
-    });
+    const text = await withAiContext({ source: 'site-order', userId: biz.user_id, businessId: biz.id }, async () =>
+      draftLeadReply({
+        kit: biz.kit,
+        siteUrl: `${publicBaseUrl()}/b/${biz.slug}`,
+        lead: { name: lead.name, contact: lead.contact, message: lead.message },
+        payment: await businessPayment(biz.id),
+      }),
+    );
     const sql = getSql();
     await sql`UPDATE business_leads SET reply_draft = ${text} WHERE id = ${lead.id} AND reply_draft IS NULL`;
   } catch (e) {
@@ -122,7 +128,11 @@ export function registerSiteRoutes(app: Hono<AppEnv>) {
   <textarea id="message" name="message" maxlength="1000"></textarea>
   <input class="hp" name="website" tabindex="-1" autocomplete="off">
   <button type="submit">${esc(w.form.submit)}</button>
-</form>`,
+</form>${
+          telegramBot()
+            ? `\n<a class="tg" href="https://t.me/${esc(telegramBot())}?start=b_${esc(biz.slug)}">✈️ Telegram</a>`
+            : ''
+        }`,
       ),
     );
   });
