@@ -13,13 +13,18 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#080a0e",
+        "backgroundColor": "#04060c",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.kisa.app",
-      "predictiveBackGestureEnabled": false
+      "googleServicesFile": "./google-services.json",
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -33,7 +38,21 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#080a0e"
+          "backgroundColor": "#04060c"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Kisa uses your location to find money-making ideas, buyers and places to post near you."
+        }
+      ],
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-notifications",
+        {
+          "color": "#4c8dff"
         }
       ]
     ],
@@ -41,7 +60,14 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "https://api-development-471e.up.railway.app"
-    }
+      "apiUrl": "https://api-development-471e.up.railway.app",
+      "googleWebClientId": "380557865039-si2rdklefm8jofiklt63f6toh2gu2cck.apps.googleusercontent.com",
+      "googleIosClientId": "",
+      "router": {},
+      "eas": {
+        "projectId": "2784b820-d04a-407b-aa7a-feca0b716291"
+      }
+    },
+    "owner": "vakito2345"
   }
 }

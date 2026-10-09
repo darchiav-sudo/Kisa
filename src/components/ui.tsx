@@ -1,83 +1,240 @@
-import { ReactNode } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ComponentProps, ReactNode, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Platform,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   View,
   ViewStyle,
 } from 'react-native';
 
-import { colors, radii, spacing } from '@/src/theme/colors';
+import { colors, gradients, radii } from '@/src/theme/colors';
 
-export function Screen({ children, style }: { children: ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.screen, style]}>{children}</View>;
+export type IconName = ComponentProps<typeof Ionicons>['name'];
+
+const native = Platform.OS !== 'web';
+
+export function tap(kind: 'light' | 'medium' | 'success' = 'light') {
+  if (!native) return;
+  if (kind === 'success') {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+  } else {
+    void Haptics.impactAsync(
+      kind === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light,
+    ).catch(() => undefined);
+  }
 }
 
-export function Pill({ children }: { children: ReactNode }) {
+/** Black backdrop with a faint deep blue at the bottom, used behind every screen. */
+export function Backdrop() {
   return (
-    <View style={styles.pill}>
-      <Text style={styles.pillText}>{children}</Text>
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient
+        colors={[...gradients.screen]}
+        locations={[...gradients.screenLocations]}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
 }
 
-export function Kicker({ children, tone = 'green' }: { children: ReactNode; tone?: 'green' | 'blue' | 'gold' }) {
-  const color = tone === 'blue' ? colors.blue : tone === 'gold' ? colors.gold : colors.green;
-  return <Text style={[styles.kicker, { color }]}>{children}</Text>;
-}
-
-export function Title({ children }: { children: ReactNode }) {
-  return <Text style={styles.title}>{children}</Text>;
-}
-
-export function Sub({ children }: { children: ReactNode }) {
-  return <Text style={styles.sub}>{children}</Text>;
-}
-
-export function Card({
-  children,
-  done,
-  style,
-}: {
-  children: ReactNode;
-  done?: boolean;
-  style?: ViewStyle;
-}) {
+/** "Kis" + a cat paw where the "a" would be. */
+export function Logo({ size = 40 }: { size?: number }) {
   return (
-    <View style={[styles.card, done && styles.cardDone, style]}>{children}</View>
+    <View style={styles.logoRow} accessibilityLabel="Kisa">
+      <Text style={[styles.logoText, { fontSize: size, lineHeight: size * 1.1 }]}>Kis</Text>
+      <View style={{ marginLeft: size * 0.04, marginTop: size * 0.12, transform: [{ rotate: '-14deg' }] }}>
+        <Ionicons name="paw" size={size * 0.86} color={colors.blueBright} style={styles.logoPaw} />
+      </View>
+    </View>
   );
 }
 
+export function Title({ children, center }: { children: ReactNode; center?: boolean }) {
+  return <Text style={[styles.title, center && { textAlign: 'center' }]}>{children}</Text>;
+}
+
+export function Sub({ children, center }: { children: ReactNode; center?: boolean }) {
+  return <Text style={[styles.sub, center && { textAlign: 'center' }]}>{children}</Text>;
+}
+
+export function SectionLabel({ children }: { children: ReactNode }) {
+  return <Text style={styles.sectionLabel}>{children}</Text>;
+}
+
+/** Glass card with a soft gradient, like VS dating's chip surfaces. */
+export function Card({
+  children,
+  active,
+  style,
+}: {
+  children: ReactNode;
+  active?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <LinearGradient
+      colors={active ? [...gradients.cardActive] : [...gradients.card]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.card, active && { borderColor: colors.blueBorder }, style]}
+    >
+      {children}
+    </LinearGradient>
+  );
+}
+
+/** Step indicator: small dots, the current one stretched into a white pill. */
+export function StepDots({ step, total }: { step: number; total: number }) {
+  return (
+    <View
+      style={styles.dotsRow}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 1, max: total, now: step + 1 }}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <View
+          key={i}
+          style={[styles.dot, i === step ? styles.dotActive : i < step ? styles.dotDone : null]}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * The VS dating "men / women" button: dark rounded pill with a colored icon.
+ * Selected → solid white with black text and a heartbeat pulse.
+ */
+export function OptionPill({
+  label,
+  icon,
+  emoji,
+  iconColor = colors.blueBright,
+  selected,
+  onPress,
+  size = 'md',
+  style,
+}: {
+  label: string;
+  icon?: IconName;
+  emoji?: string;
+  iconColor?: string;
+  selected: boolean;
+  onPress: () => void;
+  size?: 'sm' | 'md' | 'lg';
+  style?: StyleProp<ViewStyle>;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const wasSelected = useRef(selected);
+
+  useEffect(() => {
+    if (selected && !wasSelected.current) {
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.06, duration: 110, useNativeDriver: native }),
+        Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: native }),
+      ]).start();
+    }
+    wasSelected.current = selected;
+  }, [selected, scale]);
+
+  const iconSize = size === 'sm' ? 15 : size === 'lg' ? 20 : 17;
+  return (
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={label}
+        onPress={() => {
+          tap();
+          onPress();
+        }}
+        style={({ pressed }) => [
+          styles.pill,
+          size === 'sm' && styles.pillSm,
+          size === 'lg' && styles.pillLg,
+          selected && styles.pillOn,
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        {icon ? <Ionicons name={icon} size={iconSize} color={iconColor} /> : null}
+        {emoji ? <Text style={{ fontSize: iconSize }}>{emoji}</Text> : null}
+        <Text
+          numberOfLines={2}
+          style={[
+            styles.pillText,
+            size === 'sm' && { fontSize: 13 },
+            size === 'lg' && { fontSize: 16 },
+            selected && styles.pillTextOn,
+          ]}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/** Main call to action. White glowing pill (VS dating), or blue gradient for "big moments". */
 export function PrimaryButton({
   label,
   onPress,
   disabled,
   loading,
+  tone = 'white',
+  icon,
+  chevron,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
+  tone?: 'white' | 'blue';
+  icon?: IconName;
+  chevron?: boolean;
 }) {
+  const blue = tone === 'blue';
+  const fg = disabled ? colors.faint : blue ? colors.white : colors.black;
+  const content = loading ? (
+    <ActivityIndicator color={blue ? colors.white : colors.black} />
+  ) : (
+    <View style={styles.btnRow}>
+      {icon ? <Ionicons name={icon} size={18} color={fg} /> : null}
+      <Text style={[styles.primaryText, { color: fg }]}>{label}</Text>
+      {chevron ? <Ionicons name="chevron-forward" size={18} color={fg} /> : null}
+    </View>
+  );
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={() => {
+        tap('medium');
+        onPress();
+      }}
       disabled={disabled || loading}
       style={({ pressed }) => [
-        styles.primaryBtn,
-        { cursor: disabled || loading ? 'default' : 'pointer' } as object,
-        (disabled || loading) && styles.btnDisabled,
-        pressed && !disabled && { opacity: 0.9, transform: [{ scale: 0.985 }] },
+        styles.primary,
+        !disabled && (blue ? styles.blueGlow : styles.whiteGlow),
+        disabled ? styles.primaryDisabled : !blue && { backgroundColor: colors.white },
+        pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 },
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={colors.primaryBtnText} />
-      ) : (
-        <Text style={styles.primaryBtnText}>{label}</Text>
-      )}
+      {blue && !disabled ? (
+        <LinearGradient
+          colors={[...gradients.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: radii.pill }]}
+        />
+      ) : null}
+      {content}
     </Pressable>
   );
 }
@@ -85,285 +242,146 @@ export function PrimaryButton({
 export function SecondaryButton({
   label,
   onPress,
-  tone = 'default',
+  icon,
+  small,
 }: {
   label: string;
   onPress: () => void;
-  tone?: 'default' | 'good' | 'ghost';
+  icon?: IconName;
+  small?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.secondaryBtn,
-        { cursor: 'pointer' } as object,
-        tone === 'good' && styles.goodBtn,
-        tone === 'ghost' && styles.ghostBtn,
-        pressed && { opacity: 0.88 },
-      ]}
+      onPress={() => {
+        tap();
+        onPress();
+      }}
+      style={({ pressed }) => [styles.secondary, small && styles.secondarySm, pressed && { opacity: 0.8 }]}
     >
-      <Text
-        style={[
-          styles.secondaryBtnText,
-          tone === 'good' && { color: '#caffdc' },
-        ]}
-      >
-        {label}
-      </Text>
+      {icon ? <Ionicons name={icon} size={small ? 14 : 16} color={colors.text} /> : null}
+      <Text style={[styles.secondaryText, small && { fontSize: 13 }]}>{label}</Text>
     </Pressable>
   );
 }
 
-export function ProgressBar({ value, total }: { value: number; total: number }) {
-  const pct = total <= 0 ? 0 : Math.min(100, Math.round((value / total) * 100));
+export function Toast({ message }: { message: string | null }) {
+  if (!message) return null;
   return (
-    <View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${pct}%` }]} />
-      </View>
-      <Text style={styles.progressText}>
-        {value} of {total} steps ready
-      </Text>
+    <View style={styles.toast} pointerEvents="none">
+      <Ionicons name="checkmark-circle" size={18} color={colors.blueBright} />
+      <Text style={styles.toastText}>{message}</Text>
     </View>
   );
-}
-
-export function Metric({ value, label }: { value: string; label: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
-    </View>
-  );
-}
-
-export function Tag({
-  children,
-  tone = 'default',
-}: {
-  children: ReactNode;
-  tone?: 'default' | 'good' | 'gold';
-}) {
-  return (
-    <View
-      style={[
-        styles.tag,
-        tone === 'good' && styles.tagGood,
-        tone === 'gold' && styles.tagGold,
-      ]}
-    >
-      <Text
-        style={[
-          styles.tagText,
-          tone === 'good' && { color: '#c9ffda' },
-          tone === 'gold' && { color: '#ffe6a7' },
-        ]}
-      >
-        {children}
-      </Text>
-    </View>
-  );
-}
-
-export function Warning({ children }: { children: ReactNode }) {
-  return (
-    <View style={styles.warning}>
-      <Text style={styles.warningText}>{children}</Text>
-    </View>
-  );
-}
-
-export function ScriptBox({ text }: { text: string }) {
-  return (
-    <View style={styles.script}>
-      <Text style={styles.scriptText}>{text}</Text>
-    </View>
-  );
-}
-
-export function SectionLabel({ children }: { children: ReactNode }) {
-  return <Text style={styles.sectionLabel}>{children}</Text>;
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  pill: {
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: '#10151c',
-    borderRadius: radii.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  pillText: {
-    color: '#c6d2df',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+  logoRow: { flexDirection: 'row', alignItems: 'center' },
+  logoText: { color: colors.text, fontWeight: '900', letterSpacing: -1.5 },
+  logoPaw: {
+    textShadowColor: colors.blueGlow,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
   },
   title: {
     color: colors.text,
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.7,
-    lineHeight: 34,
-    marginTop: 8,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: 31,
   },
-  sub: {
-    color: '#c0cad6',
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 8,
+  sub: { color: colors.muted, fontSize: 15, lineHeight: 21, marginTop: 6 },
+  sectionLabel: {
+    marginTop: 24,
+    marginBottom: 10,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1.3,
+    color: colors.muted,
+    fontWeight: '800',
   },
   card: {
-    backgroundColor: colors.card,
+    borderWidth: 1,
     borderColor: colors.line,
-    borderWidth: 1,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-  },
-  cardDone: {
-    backgroundColor: colors.cardDone,
-    borderColor: '#34734d',
-  },
-  primaryBtn: {
-    backgroundColor: colors.primaryBtn,
-    borderRadius: radii.md,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    color: colors.primaryBtnText,
-    fontWeight: '900',
-    fontSize: 15,
-  },
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: '#354253',
-    backgroundColor: '#202a39',
-    borderRadius: radii.sm,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  goodBtn: {
-    backgroundColor: colors.greenDim,
-    borderColor: colors.greenBorder,
-  },
-  ghostBtn: {
-    backgroundColor: 'transparent',
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  progressTrack: {
-    height: 9,
-    backgroundColor: '#090d11',
-    borderWidth: 1,
-    borderColor: '#222a34',
-    borderRadius: radii.pill,
+    borderRadius: 20,
+    padding: 16,
     overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.green,
-  },
-  progressText: {
-    color: colors.muted,
-    fontSize: 12,
-    marginTop: 7,
-  },
-  metric: {
-    flex: 1,
-    minWidth: '45%',
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: '#0c1116',
-    borderRadius: 13,
+  dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.22)' },
+  dotDone: { backgroundColor: 'rgba(122,168,255,0.7)' },
+  dotActive: { width: 20, backgroundColor: colors.white },
+  pill: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  metricValue: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  metricLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  tag: {
+    justifyContent: 'center',
+    gap: 7,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#303c4b',
-    backgroundColor: '#10161d',
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.pill,
+  },
+  pillSm: { minHeight: 38, paddingVertical: 8, paddingHorizontal: 13, borderRadius: 19, gap: 6 },
+  pillLg: { minHeight: 56, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 28, gap: 10 },
+  pillOn: { backgroundColor: colors.white, borderColor: colors.white },
+  pillText: { color: 'rgba(255,255,255,0.78)', fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  pillTextOn: { color: colors.black, fontWeight: '700' },
+  btnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  primary: {
+    minHeight: 54,
     borderRadius: radii.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
   },
-  tagGood: {
-    borderColor: '#356346',
-    backgroundColor: '#102018',
+  primaryDisabled: { backgroundColor: 'rgba(255,255,255,0.08)' },
+  whiteGlow: {
+    shadowColor: colors.white,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  tagGold: {
-    borderColor: colors.goldBorder,
-    backgroundColor: colors.goldDim,
+  blueGlow: {
+    shadowColor: colors.blue,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
+    elevation: 10,
   },
-  tagText: {
-    color: '#c4cfdb',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  warning: {
-    marginTop: spacing.md,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: colors.warningBg,
+  primaryText: { fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
+  secondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 48,
+    borderRadius: radii.pill,
+    paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: colors.warningBorder,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.pill,
   },
-  warningText: {
-    color: colors.warningText,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  script: {
-    marginTop: 10,
-    backgroundColor: '#090e14',
+  secondarySm: { minHeight: 36, paddingHorizontal: 13 },
+  secondaryText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  toast: {
+    position: 'absolute',
+    bottom: 110,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#111a33',
     borderWidth: 1,
-    borderColor: '#242f3c',
-    borderRadius: 12,
-    padding: 11,
+    borderColor: colors.blueBorder,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radii.pill,
   },
-  scriptText: {
-    color: '#dfe7f0',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  sectionLabel: {
-    marginTop: 22,
-    marginBottom: 9,
-    fontSize: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    color: '#aeb9c8',
-    fontWeight: '900',
-  },
+  toastText: { color: colors.text, fontWeight: '700', fontSize: 14 },
 });

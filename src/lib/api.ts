@@ -1,9 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-const USER_KEY = 'kisa-user-id';
+import { getSessionToken } from '@/src/lib/session';
 
-function apiBase(): string {
+export function apiBase(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   const fromExtra = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl;
   return (fromEnv || fromExtra || '').replace(/\/$/, '');
@@ -13,12 +12,20 @@ export function isApiConfigured() {
   return apiBase().length > 0;
 }
 
-async function ensureUserId(): Promise<string> {
-  const existing = await AsyncStorage.getItem(USER_KEY);
-  if (existing) return existing;
-  const id = `user_${Date.now()}`;
-  await AsyncStorage.setItem(USER_KEY, id);
-  return id;
+let onUnauthorized: (() => void) | null = null;
+
+/** Called when the server rejects the session token (expired or revoked). */
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 export async function apiFetch<T>(
@@ -27,10 +34,10 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const base = apiBase();
   if (!base) throw new Error('API URL not configured');
-  const userId = await ensureUserId();
+  const token = await getSessionToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-User-Id': userId,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init.headers as Record<string, string> | undefined),
   };
   const res = await fetch(`${base}${path}`, {
@@ -40,7 +47,12 @@ export async function apiFetch<T>(
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`API ${res.status}: ${text}`);
+    if (res.status === 401 && path.startsWith('/v1/')) onUnauthorized?.();
+    let message = text;
+    try {
+      message = (JSON.parse(text) as { error?: string }).error || text;
+    } catch {}
+    throw new ApiError(res.status, message);
   }
   return (await res.json()) as T;
 }

@@ -44,3 +44,6 @@ yarn-error.*
 .env
 .env.local
 .env.*.local
+
+# Firebase service account keys (secret)
+*firebase-adminsdk*.json

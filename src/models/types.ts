@@ -1,159 +1,138 @@
-export type AppMode = 'money' | 'business';
-
-export type ChannelPreference = 'online' | 'offline' | 'either';
-
-export type LaunchActionType =
-  | 'approve'
-  | 'copy'
-  | 'simulate_publish'
-  | 'simulate_lead'
-  | 'simulate_wait'
-  | 'open_link'
-  | 'mark_done'
-  | 'collect_payment'
-  | 'repeat';
-
-export type LaunchStepKind =
-  | 'info'
-  | 'offer'
-  | 'distribution'
-  | 'approve'
-  | 'wait'
-  | 'lead'
-  | 'script'
-  | 'equipment'
-  | 'checklist'
-  | 'payment'
-  | 'repeat'
-  | 'fulfillment';
-
 export interface UserProfile {
   id: string;
   displayName: string;
+  email?: string | null;
+  avatarUrl?: string | null;
   createdAt: string;
 }
 
-export interface MoneyProfile {
-  location: string;
-  budgetUsd: number;
-  timeHours: string;
-  hasCar: boolean;
-  channel: ChannelPreference;
+/** Structured place from reverse geocoding; lets the server localize web search. */
+export interface Area {
+  countryCode?: string;
+  city?: string;
+  region?: string;
 }
 
-export interface BusinessProfile {
-  product: string;
-  location: string;
-  adBudget: string;
-  hasAudience: boolean;
-  remoteOk: boolean;
-  goal: string;
+export interface Coords {
+  lat: number;
+  lng: number;
 }
 
-export interface LaunchEvidence {
+export interface Intake {
+  start: 'new' | 'existing';
+  product?: string;
+  location: string;
+  coords?: Coords;
+  area?: Area;
+  timePerWeek?: string;
+  budget: string;
+  assets: string[];
+  skills: string[];
+  languages: string[];
+  workStyle: string;
+}
+
+export type Currency = 'GEL' | 'USD';
+
+export interface Idea {
+  title: string;
+  emoji: string;
+  oneLiner: string;
+  whyYou: string[];
+  firstMoney: string;
+  startCost: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  firstOrderEta: string;
+  currency: Currency;
+  evidence: { title: string; detail: string; source?: string; url?: string }[];
+  /** "Kisa runs it" mode: Kisa does the work, the user only approves. */
+  handsOff?: boolean;
+  /** What the user still has to do, in one line (hands-off ideas). */
+  yourPart?: string;
+  /** Research notes passed back to the server when building; not shown. */
+  researchNotes?: string;
+}
+
+export interface Kit {
+  name: string;
+  tagline: string;
+  emoji: string;
+  offer: {
+    title: string;
+    description: string;
+    price: number;
+    unit: string;
+    priceReason: string;
+    includes: string[];
+    excludes: string[];
+  };
+  website: { language: string; headline: string; subheadline: string; bullets: string[]; cta: string };
+  channels: { name: string; url?: string; why: string; postText: string }[];
+  replyScripts: { situation: string; text: string }[];
+  shoppingList: { item: string; price?: string; where?: string; url?: string; why: string }[];
+  learn: { term: string; explain: string }[];
+}
+
+export type TaskStatus = 'todo' | 'done' | 'skipped' | 'replaced';
+
+export interface Task {
   id: string;
   title: string;
-  detail: string;
-  sourceLabel?: string;
-}
-
-export interface LaunchEconomics {
-  currency: 'USD' | 'GEL';
-  starterCost?: number;
-  reserveLeft?: number;
-  offerPrice: number;
-  offerLabel: string;
-  targetUnits?: number;
-  adSpend: number;
-  notes: string[];
-}
-
-export interface LaunchChannel {
-  id: string;
-  name: string;
-  url?: string;
-  kind: 'social' | 'marketplace' | 'local' | 'partner' | 'delivery';
-}
-
-export interface LaunchAction {
-  id: string;
-  type: LaunchActionType;
-  label: string;
+  why: string;
+  kind: 'setup' | 'post' | 'message' | 'do' | 'buy' | 'learn';
   copyText?: string;
   url?: string;
-  earningAmount?: number;
-  primary?: boolean;
+  linkLabel?: string;
+  status: TaskStatus;
+  createdAt: string;
 }
 
-export interface LaunchStep {
-  id: string;
-  kind: LaunchStepKind;
-  title: string;
-  description: string;
-  script?: string;
-  checklist?: string[];
-  checklistOut?: string[];
-  items?: { title: string; price?: string; detail?: string; url?: string }[];
-  channels?: LaunchChannel[];
-  actions: LaunchAction[];
-  autoAdvanceMs?: number;
-}
-
-export interface Launch {
-  id: string;
-  mode: AppMode;
-  rank: number;
-  isPrimary: boolean;
-  title: string;
-  kicker: string;
-  summary: string;
-  tags: string[];
-  locationLabel: string;
-  economics: LaunchEconomics;
-  evidence: LaunchEvidence[];
-  steps: LaunchStep[];
-  whyNow?: string;
-}
+export type LeadStatus = 'new' | 'replied' | 'won' | 'lost';
 
 export interface Lead {
   id: string;
-  launchId: string;
   name: string;
+  contact: string;
   message: string;
-  zip?: string;
+  status: LeadStatus;
   createdAt: string;
 }
 
-export interface LaunchProgress {
-  launchId: string;
-  currentStepIndex: number;
-  completedStepIds: string[];
-  startedAt: string;
-  updatedAt: string;
-  status: 'active' | 'completed' | 'abandoned';
-  simulatedPublished?: boolean;
-  leadId?: string;
-  booked?: boolean;
-}
+export type Stage = 'launch' | 'first_sales' | 'grow';
 
-export interface EarningsEvent {
+export interface BusinessSummary {
   id: string;
-  launchId: string;
-  amount: number;
-  currency: 'USD' | 'GEL';
-  label: string;
-  at: string;
+  name: string;
+  emoji: string;
+  tagline: string;
+  status: 'active' | 'archived';
+  createdAt: string;
+  earned: number;
+  sales: number;
+  currency: Currency;
 }
 
-export interface PersistedAppState {
-  hydrated: boolean;
-  onboardingComplete: boolean;
-  mode: AppMode | null;
-  user: UserProfile | null;
-  moneyProfile: MoneyProfile | null;
-  businessProfile: BusinessProfile | null;
-  activeLaunchId: string | null;
-  progressByLaunchId: Record<string, LaunchProgress>;
-  earnings: EarningsEvent[];
-  lastAnalysisAt: string | null;
+export interface SavedIdea {
+  id: string;
+  intake: Intake;
+  idea: Idea;
+  createdAt: string;
+}
+
+export interface Business {
+  id: string;
+  slug: string;
+  siteUrl: string;
+  status: string;
+  createdAt: string;
+  intake: Intake;
+  idea: Idea;
+  kit: Kit;
+  coach: string | null;
+  stage: Stage;
+  money: { earned: number; spent: number; sales: number; currency: Currency };
+  /** Real people who opened the website (bots and link previews excluded). */
+  visits?: { total: number; week: number; today: number };
+  tasks: Task[];
+  leads: Lead[];
 }

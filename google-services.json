@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "253308148794",
+    "project_id": "kisa-app-7d21",
+    "storage_bucket": "kisa-app-7d21.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:253308148794:android:5a9ccea82e36ecdba2a903",
+        "android_client_info": {
+          "package_name": "com.kisa.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuXdLYLY7sS42LnDiH0JIlBYUqNiOcFWU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
