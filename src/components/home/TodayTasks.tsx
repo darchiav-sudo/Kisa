@@ -173,17 +173,17 @@ function OpenTask({ task, business, onFlash }: { task: Task; business: Business;
       : null;
 
   return (
-    <Card active style={busy ? { opacity: 0.6 } : undefined}>
+    <View style={[styles.openCard, busy && { opacity: 0.6 }]}>
       <Pressable onPress={() => setMore((v) => !v)} style={styles.openHead}>
         <View style={styles.taskIcon}>
-          <Ionicons name={kind.icon} size={16} color={kind.color} />
+          <Ionicons name={kind.icon} size={16} color={colors.ink} />
         </View>
         <Text style={styles.openTitle}>{task.title}</Text>
         <Pressable
           hitSlop={10}
           disabled={busy}
           onPress={() => update('done')}
-          style={styles.check}
+          style={[styles.check, styles.openCheck]}
           accessibilityLabel={`Mark ${task.title} done`}
         />
       </Pressable>
@@ -205,7 +205,7 @@ function OpenTask({ task, business, onFlash }: { task: Task; business: Business;
           }}
           style={({ pressed }) => [styles.tgBtn, (pressed || posting) && { opacity: 0.7 }]}
         >
-          {posting ? <ActivityIndicator size="small" color={colors.white} /> : <Ionicons name="paper-plane" size={14} color="#2AABEE" />}
+          {posting ? <ActivityIndicator size="small" color={colors.ink} /> : <Ionicons name="paper-plane" size={14} color="#1a8fd0" />}
           <Text style={styles.tgText} numberOfLines={1}>
             Post to {channel.title}
           </Text>
@@ -231,7 +231,7 @@ function OpenTask({ task, business, onFlash }: { task: Task; business: Business;
       <View style={styles.actions}>
         {main ? (
           <Pressable onPress={main.run} style={({ pressed }) => [styles.mainBtn, pressed && { opacity: 0.85 }]}>
-            <Ionicons name={main.icon} size={15} color={colors.text} />
+            <Ionicons name={main.icon} size={15} color={colors.ink} />
             <Text style={styles.mainBtnText} numberOfLines={1}>
               {main.label}
             </Text>
@@ -254,18 +254,18 @@ function OpenTask({ task, business, onFlash }: { task: Task; business: Business;
           style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
           accessibilityLabel={`Skip ${task.title}`}
         >
-          <Ionicons name="play-skip-forward" size={15} color={colors.mutedSoft} />
+          <Ionicons name="play-skip-forward" size={15} color={colors.inkSoft} />
         </Pressable>
         <Pressable
           onPress={() => update('done')}
           disabled={busy}
           style={({ pressed }) => [styles.doneBtn, pressed && { transform: [{ scale: 0.96 }] }]}
         >
-          <Ionicons name="checkmark" size={16} color={colors.black} />
+          <Ionicons name="checkmark" size={16} color={colors.white} />
           <Text style={styles.doneBtnText}>Done</Text>
         </Pressable>
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -320,25 +320,25 @@ const styles = StyleSheet.create({
   },
   lineTitle: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '700' },
   check: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.lineStrong },
+  openCard: { borderRadius: 20, padding: 16, backgroundColor: colors.paper },
   openHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  openCheck: { borderColor: colors.inkLine },
   taskIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(11,16,32,0.07)',
   },
-  openTitle: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '800', lineHeight: 21 },
-  why: { color: colors.mutedSoft, fontSize: 13, lineHeight: 19, marginTop: 10 },
+  openTitle: { flex: 1, color: colors.ink, fontSize: 16, fontWeight: '800', lineHeight: 21 },
+  why: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginTop: 10 },
   copyPreview: {
     marginTop: 10,
-    color: colors.mutedSoft,
+    color: colors.ink,
     fontSize: 13,
     lineHeight: 18,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(11,16,32,0.06)',
     borderRadius: 12,
     padding: 10,
   },
@@ -351,11 +351,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: colors.pill,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
+    borderColor: colors.inkLine,
   },
-  tgText: { color: colors.white, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  tgText: { color: colors.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
   mainBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -366,10 +365,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
-    backgroundColor: colors.pill,
+    borderColor: colors.inkLine,
   },
-  mainBtnText: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  mainBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
   skipBtn: {
     width: 36,
     height: 36,
@@ -377,19 +375,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.lineStrong,
-    backgroundColor: colors.pill,
+    borderColor: colors.inkLine,
   },
   doneBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.white,
+    backgroundColor: colors.ink,
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
-  doneBtnText: { color: colors.black, fontWeight: '800', fontSize: 14 },
+  doneBtnText: { color: colors.white, fontWeight: '800', fontSize: 14 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
   checkin: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   checkinText: { color: colors.blueBright, fontSize: 14, fontWeight: '700' },

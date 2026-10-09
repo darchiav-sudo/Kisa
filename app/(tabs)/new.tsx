@@ -32,7 +32,7 @@ export default function NewScreen() {
             >
               <View style={styles.hero}>
                 <View style={styles.heroIcon}>
-                  <Ionicons name="flash" size={22} color={colors.black} />
+                  <Ionicons name="flash" size={22} color={colors.ink} />
                 </View>
                 <Text style={styles.heroTitle}>Find me a business</Text>
                 <Text style={styles.heroText}>One tap. Uses your saved answers.</Text>
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   body: { padding: 16, paddingBottom: 130 },
   title: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.6, marginTop: 8 },
   heroWrap: { marginTop: 22, borderRadius: 26 },
-  hero: { borderRadius: 26, padding: 22, backgroundColor: colors.white },
+  hero: { borderRadius: 26, padding: 22, backgroundColor: colors.paper },
   heroIcon: {
     width: 44,
     height: 44,
@@ -110,8 +110,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.07)',
   },
-  heroTitle: { color: colors.black, fontSize: 24, fontWeight: '800', marginTop: 16, letterSpacing: -0.4 },
-  heroText: { color: 'rgba(0,0,0,0.6)', fontSize: 14, marginTop: 4 },
+  heroTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', marginTop: 16, letterSpacing: -0.4 },
+  heroText: { color: colors.inkSoft, fontSize: 14, marginTop: 4 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 16 },
   chip: {
     backgroundColor: 'rgba(0,0,0,0.07)',
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     maxWidth: 180,
   },
-  chipText: { color: colors.black, fontSize: 12, fontWeight: '700' },
+  chipText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
   option: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   optionIcon: {
     width: 40,

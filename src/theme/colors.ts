@@ -27,6 +27,11 @@ export const colors = {
   danger: '#ff6b81',
   white: '#ffffff',
   black: '#000000',
+  /** Soft light surface for the one thing that matters on a screen, with ink text on it. */
+  paper: '#d9e0ec',
+  ink: '#0b1020',
+  inkSoft: 'rgba(11,16,32,0.62)',
+  inkLine: 'rgba(11,16,32,0.16)',
 } as const;
 
 /** Rotating accent colors for option icons, like VS dating's pink/blue gender marks. */
